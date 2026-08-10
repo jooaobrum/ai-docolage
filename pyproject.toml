@@ -20,12 +20,20 @@ dev = [
     "mypy>=1.10.0",
     "reportlab>=4.0.0",
 ]
+paddleocr = [
+    # PaddleOCR-VL-1.6 real recognizer (ticket #6). Deliberately not in the
+    # base dependency set: it pulls in PaddlePaddle-GPU, which markdown-only
+    # or CPU-only installs shouldn't be forced to resolve. Install on the
+    # GPU cluster only.
+    "paddleocr[doc-parser]>=3.7.0,<3.8.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m 'not gpu'"
 markers = [
     "gpu: real-GPU smoke tests excluded from the default run",
 ]
