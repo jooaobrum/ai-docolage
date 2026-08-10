@@ -16,7 +16,21 @@ def __getattr__(name: str):
         from docolage.vlm_paddleocr import PaddleOCRVLRecognizer
 
         return PaddleOCRVLRecognizer
+    # Lazy: OpenAICaptioner/build_openai_captioner pull in the optional
+    # `openai` client, which installs that never escalate figures
+    # shouldn't be forced to import at package-import time (ticket #9).
+    if name in ("OpenAICaptioner", "build_openai_captioner", "resolve_openai_api_key"):
+        from docolage import captioner_openai
+
+        return getattr(captioner_openai, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
-__all__ = ["parse", "DocolageConfig", "PaddleOCRVLRecognizer"]
+__all__ = [
+    "parse",
+    "DocolageConfig",
+    "PaddleOCRVLRecognizer",
+    "OpenAICaptioner",
+    "build_openai_captioner",
+    "resolve_openai_api_key",
+]

@@ -27,6 +27,13 @@ paddleocr = [
     # GPU cluster only.
     "paddleocr[doc-parser]>=3.7.0,<3.8.0",
 ]
+openai = [
+    # Real FigureCaptioner backed by the External OpenAI API (ticket #9).
+    # Deliberately not in the base dependency set: escalation is optional
+    # end to end (CONTEXT.md "Escalation") — a plain install that never
+    # configures an OpenAI key shouldn't be forced to resolve this.
+    "openai>=1.40.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

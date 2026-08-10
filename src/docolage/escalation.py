@@ -12,9 +12,12 @@ fallback: a confident-but-empty VLM result escalates too.
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from docolage.ports_captioner import FigureCaptioner
+
+logger = logging.getLogger(__name__)
 
 _ESCALATABLE_TYPES = frozenset({"figure"})
 
@@ -36,8 +39,23 @@ def apply_escalation(
     for element in elements:
         escalate = figure_captioner is not None and _needs_escalation(element, threshold)
         if escalate and figure_captioner is not None:
-            description = figure_captioner.caption(element["image_uri"])
-            element = {**element, "description": description, "escalated": True}
+            try:
+                description = figure_captioner.caption(element["image_uri"])
+            except Exception:
+                # A captioner call that raises (network error, API error,
+                # ...) must not fail the page or the document (ticket #9) —
+                # keep the VLM's original description and move on. Logged
+                # at debug, not surfaced in error_status: this is a
+                # degradation of an optional escalation, not a page error.
+                logger.debug(
+                    "Figure captioner raised for image_uri=%r; keeping the "
+                    "original VLM description.",
+                    element["image_uri"],
+                    exc_info=True,
+                )
+                element = {**element, "escalated": element.get("escalated", False)}
+            else:
+                element = {**element, "description": description, "escalated": True}
         else:
             element = {**element, "escalated": element.get("escalated", False)}
         result.append(element)
