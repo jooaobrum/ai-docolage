@@ -35,12 +35,25 @@ class VLMRecognizer(Protocol):
 
 
 class FakeVLMRecognizer:
-    """Test double: returns pre-canned elements per page_id, records calls."""
+    """Test double: returns pre-canned elements per page_id, records calls.
 
-    def __init__(self, elements_by_page: dict[int, list[LayoutElement]]):
+    failing_pages maps page_id to the exception to raise instead of
+    returning elements, so tests can drive a page-level failure (render
+    failure, OOM, timeout) through the same seam used by the real
+    recognizer, for ADR-0006 per-page isolation.
+    """
+
+    def __init__(
+        self,
+        elements_by_page: dict[int, list[LayoutElement]],
+        failing_pages: "dict[int, Exception] | None" = None,
+    ):
         self._elements_by_page = elements_by_page
+        self._failing_pages = failing_pages or {}
         self.calls: list[tuple[str, int]] = []
 
     def recognize(self, image_path: str, page_id: int) -> list[LayoutElement]:
         self.calls.append((image_path, page_id))
+        if page_id in self._failing_pages:
+            raise self._failing_pages[page_id]
         return list(self._elements_by_page.get(page_id, []))

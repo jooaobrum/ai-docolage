@@ -18,17 +18,22 @@ def parse(path: Path, config: DocolageConfig) -> dict:
     image_uri = str(path)
     pages = [schema.make_page(_PAGE_ID, image_uri)]
 
-    layout_elements = config.vlm_recognizer.recognize(image_uri, _PAGE_ID)
-    elements = [
-        schema.make_element(
-            element_id=i,
-            element_type=le.type,
-            content=le.content,
-            confidence=le.confidence,
-            bbox=[schema.make_bbox(_PAGE_ID, le.coord)],
-            description=le.description,
-        )
-        for i, le in enumerate(layout_elements, start=1)
-    ]
+    elements: list[dict] = []
+    error_status: list[dict] = []
+    try:
+        layout_elements = config.vlm_recognizer.recognize(image_uri, _PAGE_ID)
+        elements = [
+            schema.make_element(
+                element_id=i,
+                element_type=le.type,
+                content=le.content,
+                confidence=le.confidence,
+                bbox=[schema.make_bbox(_PAGE_ID, le.coord)],
+                description=le.description,
+            )
+            for i, le in enumerate(layout_elements, start=1)
+        ]
+    except Exception as exc:  # per-page isolation, ADR-0006
+        error_status.append({"error_message": str(exc), "page_id": _PAGE_ID})
 
-    return schema.build_document(pages=pages, elements=elements, error_status=[])
+    return schema.build_document(pages=pages, elements=elements, error_status=error_status)

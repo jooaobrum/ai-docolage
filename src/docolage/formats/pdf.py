@@ -15,7 +15,7 @@ import pypdfium2 as pdfium
 
 from docolage import schema
 from docolage.config import DocolageConfig
-from docolage.rasterize import rasterize_pdf
+from docolage.rasterize import rasterize_page
 from docolage.router import is_born_digital
 from docolage.table_merge import merge_table_html
 
@@ -88,7 +88,6 @@ def parse(path: Path, config: DocolageConfig) -> dict:
     pdf = pdfium.PdfDocument(str(path))
     scale = config.dpi / _POINTS_PER_INCH
     output_dir = Path(config.output_volume_path)
-    image_paths = rasterize_pdf(pdf, output_dir, path.stem, config.dpi)
 
     pages = []
     raw_elements: list[dict] = []
@@ -96,9 +95,15 @@ def parse(path: Path, config: DocolageConfig) -> dict:
 
     for page_index in range(len(pdf)):
         page_id = page_index + 1
-        pages.append(schema.make_page(page_id, image_paths[page_index]))
 
+        # Rendering and recognition share one try/except per page (ADR-0006):
+        # a corrupt render, a GPU OOM, or a recognizer timeout are all
+        # reported the same way, and never abort sibling pages that already
+        # cost GPU time.
         try:
+            image_path = rasterize_page(pdf, page_index, output_dir, path.stem, config.dpi)
+            pages.append(schema.make_page(page_id, image_path))
+
             page = pdf[page_index]
             if is_born_digital(page):
                 raw_elements.extend(_extract_born_digital_elements(page, page_id, scale))
@@ -109,7 +114,7 @@ def parse(path: Path, config: DocolageConfig) -> dict:
                         "configured on DocolageConfig."
                     )
                 raw_elements.extend(
-                    _extract_vlm_elements(config.vlm_recognizer, image_paths[page_index], page_id)
+                    _extract_vlm_elements(config.vlm_recognizer, image_path, page_id)
                 )
         except Exception as exc:  # per-page isolation, ADR-0006
             error_status.append({"error_message": str(exc), "page_id": page_id})

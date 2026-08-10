@@ -13,19 +13,25 @@ import pypdfium2 as pdfium
 _POINTS_PER_INCH = 72
 
 
+def rasterize_page(
+    pdf: "pdfium.PdfDocument", page_index: int, output_dir: Path, doc_stem: str, dpi: int
+) -> str:
+    """Render a single page of pdf to a PNG under output_dir. Raises on
+    render failure so callers can isolate it per page (ADR-0006)."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    scale = dpi / _POINTS_PER_INCH
+    page = pdf[page_index]
+    bitmap = page.render(scale=scale)
+    pil_image = bitmap.to_pil()
+    image_path = output_dir / f"{doc_stem}-page-{page_index + 1}.png"
+    pil_image.save(image_path)
+    return str(image_path)
+
+
 def rasterize_pdf(pdf: "pdfium.PdfDocument", output_dir: Path, doc_stem: str, dpi: int) -> list[str]:
     """Render every page of pdf to a PNG under output_dir. Returns image
     paths (as strings) in page order, 1 per page."""
-    output_dir.mkdir(parents=True, exist_ok=True)
-    scale = dpi / _POINTS_PER_INCH
-    image_paths: list[str] = []
-
-    for page_index in range(len(pdf)):
-        page = pdf[page_index]
-        bitmap = page.render(scale=scale)
-        pil_image = bitmap.to_pil()
-        image_path = output_dir / f"{doc_stem}-page-{page_index + 1}.png"
-        pil_image.save(image_path)
-        image_paths.append(str(image_path))
-
-    return image_paths
+    return [
+        rasterize_page(pdf, page_index, output_dir, doc_stem, dpi)
+        for page_index in range(len(pdf))
+    ]
