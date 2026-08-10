@@ -15,6 +15,7 @@ import pypdfium2 as pdfium
 
 from docolage import schema
 from docolage.config import DocolageConfig
+from docolage.crop import CROPPABLE_TYPES, crop_element
 from docolage.rasterize import rasterize_page
 from docolage.router import is_born_digital
 from docolage.table_merge import merge_table_html
@@ -120,17 +121,28 @@ def parse(path: Path, config: DocolageConfig) -> dict:
             error_status.append({"error_message": str(exc), "page_id": page_id})
 
     raw_elements = _merge_page_break_tables(raw_elements)
+    page_image_paths = {page["id"]: page["image_uri"] for page in pages}
 
-    elements = [
-        schema.make_element(
-            element_id=i,
-            element_type=e["type"],
-            content=e["content"],
-            confidence=e["confidence"],
-            bbox=e["bbox"],
-            description=e["description"],
+    elements = []
+    for i, e in enumerate(raw_elements, start=1):
+        image_uri = ""
+        if e["type"] in CROPPABLE_TYPES:
+            first_bbox = e["bbox"][0]
+            page_image_path = page_image_paths.get(first_bbox["page_id"])
+            if page_image_path is not None:
+                image_uri = crop_element(
+                    page_image_path, first_bbox["coord"], output_dir, path.stem, first_bbox["page_id"], i
+                )
+        elements.append(
+            schema.make_element(
+                element_id=i,
+                element_type=e["type"],
+                content=e["content"],
+                confidence=e["confidence"],
+                bbox=e["bbox"],
+                description=e["description"],
+                image_uri=image_uri,
+            )
         )
-        for i, e in enumerate(raw_elements, start=1)
-    ]
 
     return schema.build_document(pages=pages, elements=elements, error_status=error_status)
