@@ -4,6 +4,7 @@ Public interface: two entry points over one shared implementation
 (ADR-0004).
 """
 
+from docolage.batch import parse_udf
 from docolage.config import DocolageConfig
 from docolage.parser import parse
 
@@ -28,6 +29,7 @@ def __getattr__(name: str):
 
 __all__ = [
     "parse",
+    "parse_udf",
     "DocolageConfig",
     "PaddleOCRVLRecognizer",
     "OpenAICaptioner",

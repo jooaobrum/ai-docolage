@@ -36,6 +36,13 @@ openai = [
     # configures an OpenAI key shouldn't be forced to resolve this.
     "openai>=1.40.0",
 ]
+spark = [
+    # parse_udf / mapInPandas batch entry point (ticket #11). Deliberately
+    # not in the base dependency set: docolage.parse() (single-document
+    # use) has no Spark dependency at all, and on a real Databricks
+    # cluster pyspark is already provided by the runtime.
+    "pyspark>=3.4.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
