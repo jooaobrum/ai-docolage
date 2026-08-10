@@ -26,9 +26,12 @@ def _register_pdf_and_image_handlers() -> None:
     import time."""
     from docolage.formats import pdf as pdf_format
     from docolage.formats import image as image_format
+    from docolage.formats import office as office_format
 
     _HANDLERS.setdefault(".pdf", pdf_format.parse)
     _HANDLERS.setdefault(".png", image_format.parse)
+    _HANDLERS.setdefault(".docx", office_format.parse)
+    _HANDLERS.setdefault(".pptx", office_format.parse)
 
 
 _register_pdf_and_image_handlers()
