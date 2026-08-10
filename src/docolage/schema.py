@@ -25,11 +25,15 @@ def make_element(
     bbox: list,
     description: str = "",
     image_uri: str = "",
+    escalated: bool = False,
 ) -> dict:
     """image_uri is only populated for Table and Figure elements (their
     standalone crop file). Text and formula elements leave it empty —
     they're represented via content + bbox into the page PNG only
-    (CONTEXT.md "Element crop")."""
+    (CONTEXT.md "Element crop"). escalated records whether description
+    came from the Figure captioner port rather than the VLM, so External
+    OpenAI API usage can be audited and cost-attributed (CONTEXT.md
+    "Escalation")."""
     return {
         "id": element_id,
         "type": element_type,
@@ -38,6 +42,7 @@ def make_element(
         "description": description,
         "bbox": bbox,
         "image_uri": image_uri,
+        "escalated": escalated,
     }
 
 

@@ -16,6 +16,7 @@ import pypdfium2 as pdfium
 from docolage import schema
 from docolage.config import DocolageConfig
 from docolage.crop import CROPPABLE_TYPES, crop_element
+from docolage.escalation import apply_escalation
 from docolage.rasterize import rasterize_page
 from docolage.router import is_born_digital
 from docolage.table_merge import merge_table_html
@@ -144,5 +145,7 @@ def parse(path: Path, config: DocolageConfig) -> dict:
                 image_uri=image_uri,
             )
         )
+
+    elements = apply_escalation(elements, config.figure_captioner, config.escalation_threshold)
 
     return schema.build_document(pages=pages, elements=elements, error_status=error_status)

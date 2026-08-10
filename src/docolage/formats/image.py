@@ -8,6 +8,7 @@ from pathlib import Path
 from docolage import schema
 from docolage.config import DocolageConfig
 from docolage.crop import CROPPABLE_TYPES, crop_element
+from docolage.escalation import apply_escalation
 
 _PAGE_ID = 1
 
@@ -41,5 +42,7 @@ def parse(path: Path, config: DocolageConfig) -> dict:
             )
     except Exception as exc:  # per-page isolation, ADR-0006
         error_status.append({"error_message": str(exc), "page_id": _PAGE_ID})
+
+    elements = apply_escalation(elements, config.figure_captioner, config.escalation_threshold)
 
     return schema.build_document(pages=pages, elements=elements, error_status=error_status)
