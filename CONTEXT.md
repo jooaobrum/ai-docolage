@@ -1,42 +1,58 @@
-# Databricks Doc Parser
+# Docolage
 
-A self-hosted document intelligence pipeline on Databricks GPU compute that mirrors `ai_parse_document`'s output shape (layout, OCR, tables, figures, structure → VARIANT/JSON) without depending on Databricks-hosted model endpoints. Shipped as a Python package named **docolage**.
+A self-hosted document intelligence pipeline that turns documents into structured layout, text, tables and figures. Shipped as a Python package named **docolage**, served by a small HTTP service with a synchronous and an asynchronous path.
 
-**Out of scope (deliberately, for now)**: chunking strategies and any downstream RAG-prep enhancements. The pipeline's job ends at the VARIANT/Delta record — chunking is a later, separate concern layered on top, not part of `docolage`'s parse output.
+**Out of scope (deliberately, for now)**: chunking strategies and any downstream RAG-prep enhancements. The pipeline's job ends at the parse result — chunking is a later, separate concern layered on top.
 
-**Supported formats**: PDF, PNG, Markdown, and (via headless LibreOffice conversion to PDF) DOCX/PPTX. DOCX/PPTX requires the `soffice` binary on the host/cluster — see [docs/office-formats.md](docs/office-formats.md) for the cluster requirement and install instructions.
+**Supported formats**: PDF, PNG, Markdown, and (via headless LibreOffice conversion to PDF) DOCX/PPTX. DOCX/PPTX requires the `soffice` binary on the host — see [docs/office-formats.md](docs/office-formats.md).
+
+**Operations**: running Workers on a real GPU, and how the Sync gate / sync stream timeout defaults were measured — see [docs/operations.md](docs/operations.md).
 
 ## Language
 
-**Model Provider (forbidden)**:
-Any Databricks-hosted inference surface billed/routed through Databricks — `ai_query()`, Databricks Foundation Model APIs, or a Databricks Model Serving pay-per-token endpoint. The pipeline must not depend on these.
-_Avoid_: "external model", "hosted model" (too broad — the forbidden thing is specifically the Databricks-billed serving path, not "any API call to any model")
+**Core**:
+`docolage.parse()` and everything beneath it — format normalization, page rasterization, recognition, cropping, captioning, schema assembly. Pure Python, no queue, no HTTP, no knowledge of jobs. The Core is what the Service calls; it is not itself a service.
+_Avoid_: "the pipeline" as a synonym for the Core (the pipeline includes the Service and the workers)
 
-**Self-hosted VLM**:
-PaddleOCR-VL-1.6, whose weights are downloaded manually, uploaded to a UC Volume, and loaded directly into the Databricks GPU notebook process. Not a Model Provider — nothing is hosted, billed, or served; the weights are read off the Volume and run in-process. Driven through PaddleOCR's own `PaddleOCRVL` pipeline (layout detection in PaddlePaddle, recognition via the transformers backend), never by prompting the raw model — see ADR-0005.
-_Avoid_: "endpoint", "serving" (there is deliberately no HTTP surface, local or otherwise, in the current design)
+**Service**:
+The deployable shell around the Core: an HTTP API, a Postgres-backed queue, and a pool of Workers. Everything in the Service is new; nothing in it is Databricks- or Spark-specific.
 
-**VLM recognizer** / **Figure captioner**:
-The two injectable ports that isolate `docolage`'s non-hermetic dependencies. The VLM recognizer wraps the Self-hosted VLM; the Figure captioner wraps the External OpenAI API. Each has a real implementation and a fake, so the whole pipeline is testable through one public seam without a GPU or a network call.
+**Sync path** / **Async path**:
+Two delivery contracts over **one** pipeline, one queue and one Worker pool — they are not separate topologies. The Sync path holds the client's connection and streams results per page as they land (SSE). The Async path returns a job id immediately and the client polls for status and the final result. A document that exceeds the sync gate is rejected from the Sync path and must be submitted asynchronously.
+_Avoid_: "sync folder" (there is no watched directory anywhere in the design), "sync pipeline"/"async pipeline" (implies two pipelines; there is one)
+
+**Sync gate**:
+The size/page-count limit above which a submission is refused on the Sync path. Its purpose is to bound how long a client connection and a Worker slot can be held.
+
+**Page job**:
+The unit of work on the queue: exactly one page of one document. Chosen over whole-document jobs so pages parallelise across Workers, fail in isolation, and stream progressively on the Sync path. The cost is deliberate and accepted: no cross-page structure (reading order across pages, table continuation), so a **Reassembly** step must order page results back into one document result.
+
+**Worker**:
+A process that claims Page jobs from the queue and runs the Core on them. Workers load the docling models in-process — there is no model-serving tier and no HTTP hop to a GPU. Worker count is therefore also GPU count.
+_Avoid_: "vLLM worker", "inference server" (deliberately not part of the MVP; see the Recognizer port)
+
+**Recognizer**:
+The injectable port isolating the model-bearing dependency, with a real implementation and a fake so the Core is testable without a GPU. The MVP implementation wraps **docling's standard pipeline** (layout model + TableFormer for tables + OCR only where a page lacks a usable text layer). The port exists precisely so a served-model implementation can replace it later without touching the Core.
+
+**Recognition fallback**:
+Page-level escalation (ADR-0012) from docling to the **External OpenAI API**: below a configured confidence threshold on docling's own per-page confidence report, the whole page is re-recognized by an OpenAI-backed Recognizer instead. Distinct from the earlier, now-superseded per-figure escalation (ADR-0003) — this thresholds on docling's page-level confidence, the only granularity docling still exposes, not a per-element signal. Silently absent with no `OPENAI_API_KEY` configured, same as the Figure captioner.
+_Avoid_: using "escalation" unqualified for this — the term now has two distinct meanings in the codebase (this page-level one, and the retired per-figure one from ADR-0003); say "recognition fallback" for this one.
+
+**Figure captioner**:
+The second injectable port, wrapping the **External OpenAI API**, which supplies descriptions for figures. docling returns figures with no description, so captioning is unconditional rather than confidence-triggered: every figure is captioned if a key is configured, and figures simply carry no description if one is not.
+_Avoid_: "escalation" for figure captioning specifically (there is no docling-produced description to escalate from — the earlier confidence-thresholded meaning no longer exists here; see **Recognition fallback** for where confidence-based escalation now lives instead)
 
 **External OpenAI API**:
-The real api.openai.com service, called via the `openai` Python client with an API key, for sub-tasks where a self-hosted model is intentionally skipped (e.g. figure/chart captioning). Explicitly allowed by the user, unlike a Databricks Model Provider — the constraint is about avoiding Databricks-billed endpoints, not about avoiding third-party APIs in general.
-
-**Router**:
-The CPU-only, pre-GPU decision that sends a page down the text-layer path (born-digital PDF, extract the embedded text layer directly, no GPU) or the VLM path (everything else — scanned pages, images, and any born-digital page, since the router does not attempt to detect tables/figures on a text-layer page). Routing is on born-digital status alone.
-_Avoid_: "table/figure pre-check" (deliberately not part of the Router — detecting tables/figures cheaply enough to matter would require running layout inference, defeating the point of a CPU-only path)
+The real api.openai.com service, called via the `openai` client with an API key, for sub-tasks where a self-hosted model is intentionally skipped (figure captioning).
 
 **Figure**:
-A `type='figure'` element from PaddleOCR-VL's layout output — a crop that is not text, a table, or a formula (e.g. a photo or diagram). Figures are always attempted with PaddleOCR-VL first; only figures whose PaddleOCR-VL output is empty/low-confidence escalate to the External OpenAI API. Charts, tables, and formulas are handled natively by PaddleOCR-VL and never escalate.
-_Avoid_: "chart" as a synonym (charts are handled natively by PaddleOCR-VL — conflating them would over-trigger escalation)
-
-**Escalation**:
-The confidence/emptiness-based decision to call the External OpenAI API for a specific Figure, made per-element after PaddleOCR-VL has already produced (or failed to produce) a `description` for it, thresholded on the element's `confidence`. Not a per-job or per-document setting — the mix happens within a single job. Escalation is optional: with no OpenAI key configured, figures simply keep PaddleOCR-VL's output.
-_Avoid_: "quality mode", "fallback" (this isn't a coarse job-level switch, and it isn't triggered by failure/errors — a confident-but-empty PaddleOCR-VL result also escalates)
+A picture element from docling's layout output — a crop that is not text, a table, or a formula (e.g. a photo or diagram). Tables and formulas are handled natively by docling and are never sent to the Figure captioner.
+_Avoid_: "chart" as a synonym
 
 **Element crop**:
-A standalone cropped image file persisted to the UC Volume (with its own `image_uri`) for a Table or Figure element only. Text and formula elements are represented by their extracted content (text/LaTeX) plus a bbox into the page PNG — no separate crop file.
-_Avoid_: "entity image" (this project's "entity" always means a layout element, never an NLP named entity — NLP entity extraction is explicitly out of scope)
+A standalone cropped image persisted to object storage (with its own URI) for a Table or Figure element only. Text and formula elements are represented by their extracted content (text/LaTeX) plus a bbox into the page image — no separate crop file.
+_Avoid_: "entity image" (this project's "entity" always means a layout element, never an NLP named entity)
 
-**docolage**:
-The Python package name for this whole pipeline. Exposes two entry points over the same underlying pyfunc: `docolage.parse(path)` for a single document, and `docolage.parse_udf()` returning a `mapInPandas`-ready function for batch runs over a Spark DataFrame.
+**Object storage**:
+S3-compatible storage (MinIO in development) holding uploads, page images, and Element crops. Together with Postgres — which holds job metadata, the queue, and page results — it is the **only** infrastructure the MVP depends on. There is deliberately no Redis, no Kafka, and no RabbitMQ.
+_Avoid_: "UC Volume" (Databricks-specific; retired)

@@ -1,0 +1,189 @@
+========== page=1 chunk=0 type=text section=(none) ==========
+[IMAGE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-1-element-1-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=1 chunk=1 type=text section=Features ==========
+# Features
+
+Glass passivated chip
+
+1500 W peak pulse power capability with a 10/1000 μs waveform, repetitive rate (duty cycle):0.01 %
+
+High reliability application and automotive grade AEC Q101 qualified
+
+Low leakage
+
+Uni and Bidirectional unit
+
+Excellent clamping capability
+
+Very fast response time
+
+RoHS compliant
+
+========== page=1 chunk=2 type=text section=Mechanical Data ==========
+# Mechanical Data
+
+Case: Molded plastic
+
+Epoxy: UL 94V-0 rate flame retardant
+
+Lead: Solderable per MIL-STD-750, method 2026
+
+Polarity: Color band denotes cathode end except Bipolar
+
+Mounting position: Any
+
+========== page=1 chunk=3 type=text section=TSMCJ Series ==========
+# TSMCJ Series
+
+========== page=1 chunk=4 type=text section=Surface Mount Transient Voltage Suppressors ==========
+# Surface Mount Transient Voltage Suppressors
+
+[IMAGE]
+section=Surface Mount Transient Voltage Suppressors
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-1-element-19-crop.png
+(no caption)
+[/IMAGE]
+
+Working Voltage: 10 to 78
+
+V
+
+Pulse Power: 1500W Peak
+
+========== page=1 chunk=5 type=text section=SMC/ DO-214AB ==========
+# SMC/ DO-214AB
+
+[IMAGE]
+section=SMC/ DO-214AB
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-1-element-24-crop.png
+(no caption)
+[/IMAGE]
+
+[IMAGE]
+section=SMC/ DO-214AB
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-1-element-25-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=1 chunk=6 type=text section=Maximum Ratings(TA=25°℃ unless otherwise noted) ==========
+# Maximum Ratings(TA=25°℃ unless otherwise noted)
+
+[TABLE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-1-element-27-crop.png
+<table><tbody><tr><td>Parameter</td><th>Symbol</th><th>Value</th><th>Unit</th></tr><tr><th>Peak power dissipation with a 10/1000μs waveform(1)</th><td>PpP</td><td>1500</td><td>W</td></tr><tr><th>Peak pulse current with a 10/1000μs waveform(1)</th><td>IpP</td><td>See Next Table</td><td>A</td></tr><tr><th>Power dissipation on infinite heatsink at TL = 75 °C</th><td>PD</td><td>6.5</td><td>W</td></tr><tr><th>Peak forward surge current, 8.3 ms single half sine- wave unidirectional only(2)</th><td>IFSM</td><td>200</td><td>A</td></tr><tr><th>Maximum instantaneous forward voltage at 100 A for unidirectional only(3)</th><td>VF</td><td>3.5/5.0</td><td>V</td></tr><tr><th>Operating junction and storage temperature range</th><td>TJ, TSTG</td><td>- 55 to +150</td><td>℃</td></tr></tbody></table>
+[/TABLE]
+
+========== page=1 chunk=7 type=text section=Note: ==========
+# Note:
+
+(1)Non-repetitive current pulse per Fig.5 and derated above T= 25 C per Fig.1
+
+(2)Measured on 8.3 ms single half sine-wave or equivalent square wave, duty cycle = 4 pulses per minute maximum
+
+(3)VF<3.5V for devices of VBR<200V and VF<5.0V for devices of VBR>201V
+
+Dimensions: i
+
+========== page=2 chunk=0 type=text section=(none) ==========
+[IMAGE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-2-element-1-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=2 chunk=1 type=text section=Electrical Characteristics(TA=25℃ unless otherwise noted) ==========
+# Electrical Characteristics(TA=25℃ unless otherwise noted)
+
+[TABLE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-2-element-3-crop.png
+<table><tbody><tr><th rowspan="2">Part Number (Uni)</th><th rowspan="2">Part Number (Bi)</th><th colspan="2">Device Marking Code</th><th colspan="3">Breakdown Voltage VBR @IT</th><th rowspan="2">Maximum Reverse Leakage IR@VRWM (μA)</th><th rowspan="2">Working Peak Reverse Voltage VRWM (V)</th><th rowspan="2">Maximum Reverse Surge Current IPP (A)</th><th rowspan="2">Maximum Clamping Voltage Vc@IPP (V)</th></tr><tr><th>Uni</th><th>Bi</th><th>Min (V)</th><th>Max (V)</th><th>Iτ (mA)</th></tr><tr><th>TSMCJ10A</th><td>TSMCJ10CA</td><td>GDXA</td><td>BDXA</td><td>11.10</td><td>12.30</td><td>1</td><td>5</td><td>10.0</td><td>88.24</td><td>17.0</td></tr><tr><th>TSMCJ11A</th><td>TSMCJ11CA</td><td>GDZA</td><td>BDZA</td><td>12.20</td><td>13.50</td><td>1</td><td>1</td><td>11.0</td><td>82.42</td><td>18.2</td></tr><tr><th>TSMCJ12A</th><td>TSMCJ12CA</td><td>GEEA</td><td>BEEA</td><td>13.30</td><td>14.70</td><td>1</td><td>1</td><td>12.0</td><td>75.38</td><td>19.9</td></tr><tr><th>TSMCJ13A</th><td>TSMCJ13CA</td><td>GEGA</td><td>BEGA</td><td>14.40</td><td>15.90</td><td>1</td><td>1</td><td>13.0</td><td>69.77</td><td>21.5</td></tr><tr><th>TSMCJ14A</th><td>TSMCJ14CA</td><td>GEKA</td><td>BEKA</td><td>15.60</td><td>17.20</td><td>1</td><td>1</td><td>14.0</td><td>64.66</td><td>23.2</td></tr><tr><th>TSMCJ15A</th><td>TSMCJ15CA</td><td>GEMA</td><td>BEMA</td><td>16.70</td><td>18.50</td><td>1</td><td>1</td><td>15.0</td><td>61.48</td><td>24.4</td></tr><tr><th>TSMCJ16A</th><td>TSMCJ16CA</td><td>GEPA</td><td>BEPA</td><td>17.80</td><td>19.70</td><td>1</td><td>1</td><td>16.0</td><td>57.69</td><td>26.0</td></tr><tr><th>TSMCJ17A</th><td>TSMCJ17CA</td><td>GERA</td><td>BERA</td><td>18.90</td><td>20.90</td><td>1</td><td>1</td><td>17.0</td><td>54.35</td><td>27.6</td></tr><tr><th>TSMCJ18A</th><td>TSMCJ18CA</td><td>GETA</td><td>BETA</td><td>20.00</td><td>22.10</td><td>1</td><td>1</td><td>18.0</td><td>51.37</td><td>29.2</td></tr><tr><th>TSMCJ19A</th><td>TSMCJ19CA</td><td>GEBA</td><td>BEBA</td><td>21.10</td><td>23.30</td><td>1</td><td>1</td><td>19.0</td><td>48.73</td><td>30.8</td></tr><tr><th>TSMCJ20A</th><td>TSMCJ20CA</td><td>GEVA</td><td>BEVA</td><td>22.20</td><td>24.50</td><td>1</td><td>1</td><td>20.0</td><td>46.30</td><td>32.4</td></tr><tr><th>TSMCJ22A</th><td>TSMCJ22CA</td><td>GEXA</td><td>BEXA</td><td>24.40</td><td>26.90</td><td>1</td><td>1</td><td>22.0</td><td>42.25</td><td>35.5</td></tr><tr><th>TSMCJ24A</th><td>TSMCJ24CA</td><td>GEZA</td><td>BEZA</td><td>26.70</td><td>29.50</td><td>1</td><td>1</td><td>24.0</td><td>38.56</td><td>38.9</td></tr><tr><th>TSMCJ26A</th><td>TSMCJ26CA</td><td>GFEA</td><td>BFEA</td><td>28.90</td><td>31.90</td><td>1</td><td>1</td><td>26.0</td><td>35.63</td><td>42.1</td></tr><tr><th>TSMCJ28A</th><td>TSMCJ28CA</td><td>GFGA</td><td>BFGA</td><td>31.10</td><td>34.40</td><td>1</td><td>1</td><td>28.0</td><td>33.04</td><td>45.4</td></tr><tr><th>TSMCJ30A</th><td>TSMCJ30CA</td><td>GFKA</td><td>BFKA</td><td>33.30</td><td>36.80</td><td>1</td><td>1</td><td>30.0</td><td>30.99</td><td>48.4</td></tr><tr><th>TSMCJ33A</th><td>TSMCJ33CA</td><td>GFMA</td><td>BFMA</td><td>36.70</td><td>40.60</td><td>1</td><td>1</td><td>33.0</td><td>28.14</td><td>53.3</td></tr><tr><th>TSMCJ36A</th><td>TSMCJ36CA</td><td>GFPA</td><td>BFPA</td><td>40.00</td><td>44.20</td><td>1</td><td>1</td><td>36.0</td><td>25.82</td><td>58.1</td></tr><tr><th>TSMCJ40A</th><td>TSMCJ40CA</td><td>GFRA</td><td>BFRA</td><td>44.40</td><td>49.10</td><td>1</td><td>1</td><td>40.0</td><td>23.26</td><td>64.5</td></tr><tr><th>TSMCJ43A</th><td>TSMCJ43CA</td><td>GFTA</td><td>BFTA</td><td>47.80</td><td>52.80</td><td>1</td><td>1</td><td>43.0</td><td>21.61</td><td>69.4</td></tr><tr><th>TSMCJ45A</th><td>TSMCJ45CA</td><td>GFVA</td><td>BFVA</td><td>50.00</td><td>55.30</td><td>1</td><td>1</td><td>45.0</td><td>20.63</td><td>72.7</td></tr><tr><th>TSMCJ48A</th><td>TSMCJ48CA</td><td>GFXA</td><td>BFXA</td><td>53.30</td><td>58.90</td><td>1</td><td>1</td><td>48.0</td><td>19.38</td><td>77.4</td></tr><tr><th>TSMCJ51A</th><td>TSMCJ51CA</td><td>GFZA</td><td>BFZA</td><td>56.70</td><td>62.70</td><td>1</td><td>1</td><td>51.0</td><td>18.20</td><td>82.4</td></tr><tr><th>TSMCJ54A</th><td>TSMCJ54CA</td><td>GGEA</td><td>BGEA</td><td>60.00</td><td>66.30</td><td>1</td><td>1</td><td>54.0</td><td>17.22</td><td>87.1</td></tr><tr><th>TSMCJ58A</th><td>TSMCJ58CA</td><td>GGGA</td><td>BGGA</td><td>64.40</td><td>71.20</td><td>1</td><td>1</td><td>58.0</td><td>16.03</td><td>93.6</td></tr><tr><th>TSMCJ60A</th><td>TSMCJ60CA</td><td>GGKA</td><td>BGKA</td><td>66.70</td><td>73.70</td><td>1</td><td>1</td><td>60.0</td><td>15.50</td><td>96.8</td></tr><tr><th>TSMCJ64A</th><td>TSMCJ64CA</td><td>GGMA</td><td>BGMA</td><td>71.10</td><td>78.60</td><td>1</td><td>1</td><td>64.0</td><td>14.56</td><td>103.0</td></tr><tr><th>TSMCJ70A</th><td>TSMCJ70CA</td><td>GGPA</td><td>BGPA</td><td>77.80</td><td>86.00</td><td>1</td><td>1</td><td>70.0</td><td>13.27</td><td>113.0</td></tr><tr><th>TSMCJ75A</th><td>TSMCJ75CA</td><td>GGRA</td><td>BGRA</td><td>83.30</td><td>92.10</td><td>1</td><td>1</td><td>75.0</td><td>12.40</td><td>121.0</td></tr><tr><th>TSMCJ78A</th><td>TSMCJ78CA</td><td>GGTA</td><td>BGTA</td><td>86.70</td><td>95.80</td><td>1</td><td>1</td><td>78.0</td><td>11.90</td><td>126.0</td></tr></tbody></table>
+[/TABLE]
+
+========== page=2 chunk=2 type=text section=Note: ==========
+# Note:
+
+1. Add suffix 'C 'or 'CA 'after part number to specify Bi-directional devices 2. For Bi-Directional devices having VR of 10 volts and under, the IR limit is double
+
+[IMAGE]
+section=Note:
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-2-element-6-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=3 chunk=0 type=text section=(none) ==========
+[IMAGE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-1-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=3 chunk=1 type=text section=TSMCJ Series ==========
+# TSMCJ Series
+
+========== page=3 chunk=2 type=text section=Surface Mount Transient Voltage Suppressors ==========
+# Surface Mount Transient Voltage Suppressors
+
+[IMAGE]
+section=Surface Mount Transient Voltage Suppressors
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-4-crop.png
+(no caption)
+[/IMAGE]
+
+========== page=3 chunk=3 type=text section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted) ==========
+# Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-6-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 1 - Pulse Derating Curve
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-8-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 3 - Steady State Power Derating Curve
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-10-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 5 - Pulse Waveform
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-12-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 2 - Maximum Non-Repetitive Surge Current
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-14-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 4 - Peak Pulse Power Rating Curve
+
+[IMAGE]
+section=Ratings and Characteristics Curves (TA=25°C unless otherwise noted)
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-16-crop.png
+(no caption)
+[/IMAGE]
+
+Fig. 6 - Typical Junction Capacitance
+
+[TABLE]
+path=/tmp/docolage-worker-ljg42qp0/3135ada1-119a-43af-a02b-d98a72b69be8/pages/source-page-3-element-18-crop.png
+<table><tbody><tr><th>PACKAGE</th><th>SPQ/PCS</th><th>CARTON SPQ/PCS</th><th>CARTON SIZE/CM</th><th>CARTON GW/KG</th><th>CARTON NW/KG</th></tr><tr><td>SMC</td><td>3000/REEL</td><td>42000</td><td>36X36X36.5</td><td>18.50</td><td>15.50</td></tr></tbody></table>
+[/TABLE]
+
