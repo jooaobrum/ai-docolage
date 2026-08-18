@@ -1,6 +1,8 @@
 # ai-docolage
 
-<img src="docs/imgs/logo.png" alt="ai-docolage logo" width="400">
+<p align="center">
+  <img src="docs/imgs/logo.png" alt="ai-docolage logo" width="600">
+</p>
 
 
 A self-hosted document intelligence pipeline that turns documents (PDF,
