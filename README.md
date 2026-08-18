@@ -1,5 +1,7 @@
 # ai-docolage
 
+![ai-docolage logo](docs/imgs/logo.png)
+
 A self-hosted document intelligence pipeline that turns documents (PDF,
 PNG, Markdown, DOCX, PPTX) into structured layout, text, tables and
 figures — no cloud account, no cluster, no vendor lock-in.
