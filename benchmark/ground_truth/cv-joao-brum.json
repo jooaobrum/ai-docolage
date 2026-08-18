@@ -1,0 +1,15 @@
+{
+  "id": "cv-joao-brum",
+  "notes": "1-page born-digital CV, plain text layout, no tables or figures.",
+  "expected_text_contains": [
+    "JOAO BRUM",
+    "Data Scientist",
+    "STMicroelectronics",
+    "Databricks ML Professional certified"
+  ],
+  "expected_min_element_counts": {
+    "text": 1,
+    "table": 0,
+    "figure": 0
+  }
+}

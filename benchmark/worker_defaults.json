@@ -1,0 +1,43 @@
+{
+  "hardware": "CPU (see script docstring - re-run on target GPU host for production defaults)",
+  "model_load_seconds": 69.37,
+  "pages_measured": 14,
+  "per_page_latency_seconds": {
+    "mean": 27.827,
+    "p50": 29.85,
+    "p95": 56.562,
+    "max": 56.562
+  },
+  "per_document": [
+    {
+      "id": "cv-joao-brum",
+      "total_pages": 1,
+      "pages_measured": 1,
+      "mean_seconds": 56.562
+    },
+    {
+      "id": "tsmcj",
+      "total_pages": 3,
+      "pages_measured": 3,
+      "mean_seconds": 36.844
+    },
+    {
+      "id": "paper",
+      "total_pages": 16,
+      "pages_measured": 5,
+      "mean_seconds": 33.311
+    },
+    {
+      "id": "stmicro-financial-report",
+      "total_pages": 469,
+      "pages_measured": 5,
+      "mean_seconds": 11.187
+    }
+  ],
+  "target_sync_seconds": 45.0,
+  "timeout_margin_multiplier": 2.0,
+  "recommended_defaults": {
+    "sync_gate_max_pages": 1,
+    "sync_stream_timeout_seconds": 55.7
+  }
+}

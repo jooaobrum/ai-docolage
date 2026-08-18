@@ -1,0 +1,14 @@
+{
+  "id": "paper",
+  "notes": "16-page born-digital academic paper. Text extraction found 15 distinct captioned figures (Figure 1. .. Figure 15.) and zero 'Table' captions.",
+  "expected_text_contains": [
+    "Spatio-temporal evolution of the nonresonant instability in",
+    "MNRAS",
+    "ABSTRACT"
+  ],
+  "expected_min_element_counts": {
+    "text": 1,
+    "table": 0,
+    "figure": 15
+  }
+}

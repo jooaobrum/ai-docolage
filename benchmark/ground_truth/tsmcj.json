@@ -1,0 +1,14 @@
+{
+  "id": "tsmcj",
+  "notes": "3-page born-digital datasheet. Page 2 alone has 6 characteristic-curve figures (Fig.1-Fig.6) and a packaging table; page 3 has a parameter table.",
+  "expected_text_contains": [
+    "TSMCJ Series",
+    "Peak Pulse Power: 1500W",
+    "Parameter Symbol Value Unit"
+  ],
+  "expected_min_element_counts": {
+    "text": 1,
+    "table": 2,
+    "figure": 6
+  }
+}

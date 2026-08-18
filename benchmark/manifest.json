@@ -1,0 +1,32 @@
+{
+  "documents": [
+    {
+      "id": "cv-joao-brum",
+      "filename": "CV JOAO BRUM.pdf",
+      "path": "data/CV JOAO BRUM.pdf",
+      "format": "pdf",
+      "size_bytes": 71585
+    },
+    {
+      "id": "tsmcj",
+      "filename": "TSMCJ.PDF",
+      "path": "data/TSMCJ.PDF",
+      "format": "pdf",
+      "size_bytes": 1196914
+    },
+    {
+      "id": "paper",
+      "filename": "paper.pdf",
+      "path": "data/paper.pdf",
+      "format": "pdf",
+      "size_bytes": 3783154
+    },
+    {
+      "id": "stmicro-financial-report",
+      "filename": "stmicro-financial-report.pdf",
+      "path": "data/stmicro-financial-report.pdf",
+      "format": "pdf",
+      "size_bytes": 6405512
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "stmicro-financial-report",
+  "notes": "469-page annual report. The born-digital text layer is garbled by a non-standard font encoding (confirmed via pypdfium2 raw text extraction returning cipher-like text on early pages) - a good stress test for docolage's born-digital-vs-VLM routing. Cover page (visually confirmed by rendering) is a title + product photo, no table. 'table' count is left unset (null) since hand-counting tables across 469 pages of financial statements is impractical for a minimal benchmark; only text and figure are checked.",
+  "expected_text_contains": [
+    "STMicroelectronics N.V.",
+    "Annual Report",
+    "2025"
+  ],
+  "expected_min_element_counts": {
+    "text": 1,
+    "table": null,
+    "figure": 1
+  }
+}
