@@ -1,7 +1,7 @@
 """DOCX/PPTX -> PDF normalization via headless LibreOffice (ticket #10).
 
 LibreOffice is an undeclared system dependency: it cannot be
-pip-installed and must be present on the cluster (see
+pip-installed and must be present on the host (see
 docs/office-formats.md). This module's only job is to shell out to
 `soffice --headless --convert-to pdf` and turn its two failure modes
 (binary missing, conversion failing for a specific file) into
@@ -16,19 +16,20 @@ import subprocess
 from pathlib import Path
 
 from docolage.exceptions import DocumentConversionError, LibreOfficeNotFoundError
+from docolage.settings_loader import section
 
 _SOFFICE_BINARY = "soffice"
-_CONVERT_TIMEOUT_SECONDS = 120
+DEFAULT_CONVERT_TIMEOUT_SECONDS: int = section("office_convert")["timeout_seconds"]
 
 
-def convert_to_pdf(path: Path, output_dir: Path) -> Path:
+def convert_to_pdf(path: Path, output_dir: Path, timeout_seconds: int = DEFAULT_CONVERT_TIMEOUT_SECONDS) -> Path:
     """Convert a DOCX/PPTX file at path to a PDF under output_dir via
     headless LibreOffice. Returns the path to the converted PDF.
 
     Raises:
         LibreOfficeNotFoundError: the ``soffice`` binary is not on PATH.
         DocumentConversionError: LibreOffice ran but failed to produce
-            a PDF for this specific file.
+            a PDF for this specific file, or timed out.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +46,7 @@ def convert_to_pdf(path: Path, output_dir: Path) -> Path:
             ],
             capture_output=True,
             text=True,
-            timeout=_CONVERT_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
         )
     except FileNotFoundError as exc:
         raise LibreOfficeNotFoundError(str(path)) from exc

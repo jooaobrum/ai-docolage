@@ -44,7 +44,7 @@ def parse(path: str, config: Optional[DocolageConfig] = None) -> dict:
         path: filesystem path to the document.
         config: explicit DocolageConfig; defaults to DocolageConfig()
             when omitted (sufficient for formats that need no model
-            path or output volume, e.g. Markdown).
+            path or output path, e.g. Markdown).
     """
     config = config or DocolageConfig()
     file_path = Path(path)

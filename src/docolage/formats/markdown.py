@@ -1,7 +1,7 @@
 """Markdown format handler: text -> ai_parse_document-shaped dict.
 
-Markdown has no rasterized pages (spec: bypasses rasterization, the
-Router, and the GPU entirely), so document.pages is empty and every
+Markdown has no rasterized pages (spec: bypasses rasterization and
+the Recognizer entirely), so document.pages is empty and every
 element's bbox uses a placeholder page_id of 1 with no real geometry
 — there is no page image for a coordinate to be relative to.
 """

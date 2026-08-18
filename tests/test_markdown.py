@@ -79,9 +79,7 @@ def test_unsupported_extension_raises_clear_error(fixtures_dir, tmp_path):
 
 def test_config_has_no_hardcoded_defaults_and_no_globals():
     config = docolage.DocolageConfig(
-        model_path="/Volumes/models/paddleocr-vl",
-        output_volume_path="/Volumes/output",
-        escalation_threshold=0.7,
+        output_path="/tmp/output",
     )
     result = docolage.parse("tests/fixtures/simple.md", config)
     assert isinstance(result, dict)

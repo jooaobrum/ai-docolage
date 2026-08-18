@@ -4,7 +4,8 @@ captioner", ADR-0003).
 One injectable seam for the non-hermetic External OpenAI API dependency.
 The real implementation (ticket #9) wraps the `openai` client; the fake
 here returns canned descriptions and records which calls it received, so
-escalation is fully testable without a network.
+figure captioning (ADR-0010: unconditional when a key is configured) is
+fully testable without a network.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ class FakeFigureCaptioner:
     """Test double: returns a pre-canned description per image_path,
     falling back to `default` when the path isn't in `descriptions`.
     Records every image_path it was asked to caption, in call order, so
-    tests can assert exactly which elements escalated."""
+    tests can assert exactly which elements were captioned."""
 
     def __init__(self, descriptions: Optional[dict[str, str]] = None, default: str = "a captioned figure"):
         self._descriptions = descriptions or {}

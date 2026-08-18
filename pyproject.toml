@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ai-docolage"
-version = "0.1.0"
+version = "0.1.2"
 description = "Self-hosted document parsing pipeline mirroring ai_parse_document's output shape, without a Databricks Model Provider."
 readme = "CONTEXT.md"
 requires-python = ">=3.10"
@@ -12,22 +12,27 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "pypdfium2>=4.30.0",
     "Pillow>=10.0.0",
+    # Parses docolage.yaml, the one source of truth for every tunable
+    # parameter (settings_loader.py).
+    "PyYAML>=6.0.0",
+    # docling's standard pipeline (layout model + TableFormer + OCR-when-
+    # needed) is the new default recognition engine (ADR-0010) and, unlike
+    # PaddleOCR-VL, runs CPU-only out of the box with no GPU-only transitive
+    # deps and no hand-provisioned weights directory — so it belongs in the
+    # Core's base install rather than an optional extra.
+    "docling>=2.0.0",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
     "mypy>=1.10.0",
     "reportlab>=4.0.0",
     "python-docx>=1.0.0",
     "python-pptx>=0.6.23",
-]
-paddleocr = [
-    # PaddleOCR-VL-1.6 real recognizer (ticket #6). Deliberately not in the
-    # base dependency set: it pulls in PaddlePaddle-GPU, which markdown-only
-    # or CPU-only installs shouldn't be forced to resolve. Install on the
-    # GPU cluster only.
-    "paddleocr[doc-parser]>=3.7.0,<3.8.0",
+    "httpx>=0.27.0",
+    "testcontainers[postgres,minio]>=4.0.0",
 ]
 openai = [
     # Real FigureCaptioner backed by the External OpenAI API (ticket #9).
@@ -36,20 +41,36 @@ openai = [
     # configures an OpenAI key shouldn't be forced to resolve this.
     "openai>=1.40.0",
 ]
-spark = [
-    # parse_udf / mapInPandas batch entry point (ticket #11). Deliberately
-    # not in the base dependency set: docolage.parse() (single-document
-    # use) has no Spark dependency at all, and on a real Databricks
-    # cluster pyspark is already provided by the runtime.
-    "pyspark>=3.4.0",
+service = [
+    # The docolage_service package (ticket #19): HTTP API, Postgres-backed
+    # queue, object storage. Deliberately not in the base dependency set —
+    # spec section "Package boundary": "a plain Core install stays free of
+    # the web framework, database driver, and object storage client."
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "asyncpg>=0.29.0",
+    "boto3>=1.34.0",
+    "pydantic-settings>=2.2.0",
+    "python-multipart>=0.0.9",
 ]
+
+[project.scripts]
+docolage-worker = "docolage_service.worker.main:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+docolage = ["docolage.yaml"]
+docolage_service = ["db/migrations/*.sql"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not gpu'"
+addopts = "-m 'not gpu and not service and not docling'"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "gpu: real-GPU smoke tests excluded from the default run",
+    "service: Service tests needing real Postgres/MinIO, excluded from the default run",
+    "docling: real-docling-model smoke tests excluded from the default run",
 ]

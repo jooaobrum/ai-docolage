@@ -1,8 +1,8 @@
 """Standalone element crops (spec "Element crops", CONTEXT.md "Element crop").
 
-Table and Figure elements get their own cropped image file on the
-configured output Volume path, cut from the already-rasterized page PNG
-at the element's bbox coordinates. Text and formula elements never call
+Table and Figure elements get their own cropped image file under the
+configured output path, cut from the already-rasterized page PNG at
+the element's bbox coordinates. Text and formula elements never call
 this — they stay represented by content + bbox into the page PNG alone.
 """
 

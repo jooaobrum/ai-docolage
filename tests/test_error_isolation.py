@@ -26,7 +26,7 @@ def test_one_failing_page_is_isolated_and_siblings_still_produce_elements(
         },
         failing_pages={2: TimeoutError("VLM recognizer timed out after 30s")},
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned_multi_page.pdf"), config)
 
@@ -51,7 +51,7 @@ def test_error_status_is_always_an_array_with_no_failures(fixtures_dir, tmp_outp
     fake = FakeVLMRecognizer(
         {1: [LayoutElement(type="text", content="Hello", confidence=0.9, coord=[0, 0, 1, 1])]}
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned.pdf"), config)
 
@@ -68,7 +68,7 @@ def test_error_status_entries_are_json_serializable_and_sql_findable(
         {1: []},
         failing_pages={1: RuntimeError("GPU OOM while recognizing page")},
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned.pdf"), config)
 
@@ -97,7 +97,7 @@ def test_failing_page_recognizer_does_not_prevent_other_pages_from_being_attempt
         },
         failing_pages={1: RuntimeError("corrupt render on page 1")},
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned_multi_page.pdf"), config)
 

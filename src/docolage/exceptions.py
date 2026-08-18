@@ -25,8 +25,8 @@ class LibreOfficeNotFoundError(RuntimeError):
 
     DOCX/PPTX support (ticket #10) normalizes those formats to PDF via
     headless LibreOffice before they reach the standard rasterize ->
-    Router -> parse path. LibreOffice cannot be pip-installed; it must
-    be present on the cluster (see docs/office-formats.md), which makes
+    recognize -> parse path. LibreOffice cannot be pip-installed; it must
+    be present on the host (see docs/office-formats.md), which makes
     a missing binary a setup problem rather than a bug in a specific
     document. This surfaces that as an actionable message instead of a
     raw FileNotFoundError/subprocess trace.
@@ -39,8 +39,8 @@ class LibreOfficeNotFoundError(RuntimeError):
             "or not on PATH. docolage requires headless LibreOffice to parse "
             "DOCX/PPTX files by converting them to PDF. Install LibreOffice "
             "(e.g. `apt-get install libreoffice` on Debian/Ubuntu, `brew install "
-            "--cask libreoffice` on macOS, or add it to your Databricks cluster "
-            "init script) and ensure `soffice` is on PATH."
+            "--cask libreoffice` on macOS, or add it to your deployment "
+            "image/init script) and ensure `soffice` is on PATH."
         )
 
 

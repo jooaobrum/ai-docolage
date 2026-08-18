@@ -1,10 +1,11 @@
-"""PDF format handler: rasterize, Router, born-digital text, VLM path.
+"""PDF format handler: rasterize, then run every page through the
+configured Recognizer.
 
 Every page rasterizes to a PNG first (image_uri comes from that for
-free). The Router then decides, per page and on born-digital status
-alone, between direct text-layer extraction (no GPU) and the VLM
-recognizer port. A table spanning a page break is merged into one
-element afterwards.
+free). The Recognizer (docolage.ports.VLMRecognizer) then decides,
+internally and per page, whether OCR is needed — there is no separate
+CPU-only text-layer path (ADR-0010: the Router is deleted). A table
+spanning a page break is merged into one element afterwards.
 """
 
 from __future__ import annotations
@@ -14,49 +15,18 @@ from pathlib import Path
 import pypdfium2 as pdfium
 
 from docolage import schema
-from docolage.config import DocolageConfig
+from docolage.config import DocolageConfig, default_recognizer
+from docolage.captioning import caption_figures
 from docolage.crop import CROPPABLE_TYPES, crop_element
-from docolage.escalation import apply_escalation
 from docolage.rasterize import rasterize_page
-from docolage.router import is_born_digital
 from docolage.table_merge import merge_table_html
 
-_POINTS_PER_INCH = 72
 
-
-def _extract_born_digital_elements(page, page_id: int, scale: float) -> list[dict]:
-    textpage = page.get_textpage()
-    _, page_height = page.get_size()
-    elements = []
-    try:
-        for i in range(textpage.count_rects()):
-            left, bottom, right, top = textpage.get_rect(i)
-            text = textpage.get_text_bounded(left, bottom, right, top).strip()
-            if not text:
-                continue
-            pixel_coord = [
-                round(left * scale),
-                round((page_height - top) * scale),
-                round(right * scale),
-                round((page_height - bottom) * scale),
-            ]
-            elements.append(
-                {
-                    "type": "text",
-                    "content": text,
-                    "confidence": 1.0,
-                    "description": "",
-                    "bbox": [{"page_id": page_id, "coord": pixel_coord}],
-                }
-            )
-    finally:
-        textpage.close()
-    return elements
-
-
-def _extract_vlm_elements(vlm_recognizer, image_path: str, page_id: int) -> list[dict]:
-    layout_elements = vlm_recognizer.recognize(image_path, page_id)
-    return [
+def _extract_vlm_elements(vlm_recognizer, image_path: str, page_id: int) -> tuple[list[dict], str]:
+    """Return this page's structured elements and its rendered markdown
+    (ticket #16) — both come out of one Recognizer call."""
+    result = vlm_recognizer.recognize(image_path, page_id)
+    elements = [
         {
             "type": le.type,
             "content": le.content,
@@ -64,8 +34,9 @@ def _extract_vlm_elements(vlm_recognizer, image_path: str, page_id: int) -> list
             "description": le.description,
             "bbox": [{"page_id": page_id, "coord": le.coord}],
         }
-        for le in layout_elements
+        for le in result.elements
     ]
+    return elements, result.markdown
 
 
 def _merge_page_break_tables(raw_elements: list[dict]) -> list[dict]:
@@ -88,8 +59,7 @@ def _merge_page_break_tables(raw_elements: list[dict]) -> list[dict]:
 
 def parse(path: Path, config: DocolageConfig) -> dict:
     pdf = pdfium.PdfDocument(str(path))
-    scale = config.dpi / _POINTS_PER_INCH
-    output_dir = Path(config.output_volume_path)
+    output_dir = Path(config.output_path)
 
     pages = []
     raw_elements: list[dict] = []
@@ -104,20 +74,13 @@ def parse(path: Path, config: DocolageConfig) -> dict:
         # cost GPU time.
         try:
             image_path = rasterize_page(pdf, page_index, output_dir, path.stem, config.dpi)
-            pages.append(schema.make_page(page_id, image_path))
+            page = schema.make_page(page_id, image_path)
+            pages.append(page)
 
-            page = pdf[page_index]
-            if is_born_digital(page):
-                raw_elements.extend(_extract_born_digital_elements(page, page_id, scale))
-            else:
-                if config.vlm_recognizer is None:
-                    raise RuntimeError(
-                        "Page has no embedded text layer and no vlm_recognizer is "
-                        "configured on DocolageConfig."
-                    )
-                raw_elements.extend(
-                    _extract_vlm_elements(config.vlm_recognizer, image_path, page_id)
-                )
+            recognizer = config.vlm_recognizer if config.vlm_recognizer is not None else default_recognizer()
+            page_elements, page_markdown = _extract_vlm_elements(recognizer, image_path, page_id)
+            raw_elements.extend(page_elements)
+            page["markdown"] = page_markdown
         except Exception as exc:  # per-page isolation, ADR-0006
             error_status.append({"error_message": str(exc), "page_id": page_id})
 
@@ -146,6 +109,6 @@ def parse(path: Path, config: DocolageConfig) -> dict:
             )
         )
 
-    elements = apply_escalation(elements, config.figure_captioner, config.escalation_threshold)
+    elements = caption_figures(elements, config.figure_captioner)
 
     return schema.build_document(pages=pages, elements=elements, error_status=error_status)

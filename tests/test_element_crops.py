@@ -22,7 +22,7 @@ def test_table_and_figure_elements_get_crop_files_text_and_formula_do_not(fixtur
             ]
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(Path("tests/fixtures/scanned.pdf")), config)
     elements = {e["type"]: e for e in result["document"]["elements"]}
@@ -58,7 +58,7 @@ def test_png_table_and_figure_elements_also_get_crop_files(fixtures_dir, tmp_out
             ]
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "standalone.png"), config)
     elements = {e["type"]: e for e in result["document"]["elements"]}

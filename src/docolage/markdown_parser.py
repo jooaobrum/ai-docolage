@@ -1,6 +1,6 @@
 """Markdown -> typed elements, in reading order.
 
-Markdown bypasses rasterization, the Router, and the GPU entirely (spec
+Markdown bypasses rasterization and the Recognizer entirely (spec
 "Ingestion and format normalization"): its existing structure already
 maps onto the element schema, so this module reads the source text
 directly rather than rendering it to an image first.

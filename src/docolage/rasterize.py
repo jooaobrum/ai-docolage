@@ -1,7 +1,7 @@
 """Page rasterization via pypdfium2, at a fixed 200 DPI (spec).
 
-Every page becomes a PNG on the configured output Volume path — this is
-where image_uri comes from for free, ahead of the Router or any GPU work.
+Every page becomes a PNG under the configured output path — this is
+where image_uri comes from for free, ahead of the Recognizer's GPU work.
 """
 
 from __future__ import annotations

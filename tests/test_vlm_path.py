@@ -10,7 +10,7 @@ def test_scanned_pdf_routes_to_vlm_and_produces_ocrd_content(fixtures_dir, tmp_o
             ]
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned.pdf"), config)
 
@@ -27,7 +27,7 @@ def test_standalone_png_parses_as_single_page_through_vlm(fixtures_dir, tmp_outp
     fake = FakeVLMRecognizer(
         {1: [LayoutElement(type="text", content="Scanned page content", confidence=0.9, coord=[0, 0, 10, 10])]}
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "standalone.png"), config)
 
@@ -56,7 +56,7 @@ def test_element_types_and_content_shapes(fixtures_dir, tmp_output_volume):
             ]
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned.pdf"), config)
     elements = result["document"]["elements"]
@@ -87,12 +87,34 @@ def test_reading_order_matches_recognizer_order(fixtures_dir, tmp_output_volume)
             ]
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned.pdf"), config)
     contents = [e["content"] for e in result["document"]["elements"]]
 
     assert contents == ["First", "Second", "Third"]
+
+
+def test_page_markdown_is_carried_through_to_the_final_document(fixtures_dir, tmp_output_volume):
+    """Ticket #16: every page result carries rendered markdown alongside
+    its structured elements (spec user stories 45/46)."""
+    fake = FakeVLMRecognizer(
+        {
+            1: [LayoutElement(type="heading-1", content="Page One", confidence=0.9, coord=[0, 0, 1, 1])],
+            2: [LayoutElement(type="text", content="Page two body", confidence=0.9, coord=[0, 0, 1, 1])],
+        },
+        markdown_by_page={
+            1: "# Page One",
+            2: "Page two body",
+        },
+    )
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
+
+    result = docolage.parse(str(fixtures_dir / "scanned_multi_page.pdf"), config)
+    pages = {p["id"]: p for p in result["document"]["pages"]}
+
+    assert pages[1]["markdown"] == "# Page One"
+    assert pages[2]["markdown"] == "Page two body"
 
 
 def test_table_spanning_page_break_merges_into_one_element(fixtures_dir, tmp_output_volume):
@@ -116,7 +138,7 @@ def test_table_spanning_page_break_merges_into_one_element(fixtures_dir, tmp_out
             ],
         }
     )
-    config = docolage.DocolageConfig(output_volume_path=str(tmp_output_volume), vlm_recognizer=fake)
+    config = docolage.DocolageConfig(output_path=str(tmp_output_volume), vlm_recognizer=fake)
 
     result = docolage.parse(str(fixtures_dir / "scanned_multi_page.pdf"), config)
     elements = result["document"]["elements"]

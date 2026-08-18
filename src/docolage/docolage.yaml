@@ -1,0 +1,114 @@
+# docolage — single source of truth for every tunable parameter: models,
+# thresholds, prompts, timeouts, DPI, and queue/sync knobs. Both config
+# objects (DocolageConfig in docolage/config.py, Settings in
+# docolage_service/config.py) read their defaults from here at import
+# time, grouped by the same concerns as the sections below.
+#
+# What is deliberately NOT here: secrets and per-deployment connection
+# info (Postgres DSN, object storage credentials/endpoint, OPENAI_API_KEY).
+# Those stay in environment variables (docolage_service/config.py,
+# DOCOLAGE_* prefix) — they vary per environment and must never be
+# committed to a file that ships with the package.
+#
+# Override the whole file's location with the DOCOLAGE_CONFIG_PATH
+# environment variable (e.g. to bind-mount a production copy over the
+# packaged default without rebuilding the image); Settings-level fields
+# can still be overridden individually via their own DOCOLAGE_* env var,
+# same as before.
+
+# Page rasterization and the docling recognizer's escalation threshold.
+recognition:
+  dpi: 200
+  # Tuned against the 478 pages already in page_results (2026-08-18):
+  # docling's mean_score ranged 0.7408-0.9862, mean 0.938, p50 0.950. At
+  # 0.85, 23 pages (~5%) escalate -- the genuine long tail (the worst,
+  # page 189 of stmicro-financial-report.pdf at 0.7408, was confirmed
+  # garbled OCR on inspection). 0.90 would escalate 60 pages (~13%),
+  # roughly tripling OpenAI spend for pages that mostly looked fine on
+  # spot check. Re-tune if the mix of documents processed changes
+  # materially from this sample.
+  confidence_threshold: 0.85
+
+# The External OpenAI API, shared by the Figure captioner and the
+# recognition fallback (docolage/openai_client.py, captioner_openai.py,
+# recognizer_openai.py).
+openai:
+  model: gpt-5.6-luna
+  figure_caption_prompt: >-
+    Describe this figure in one or two concise sentences.
+  recognition_prompt: |
+    You are a document layout recognizer. Analyze this page image and return a single JSON object with exactly this shape:
+
+    {
+      "elements": [
+        {
+          "type": "<one of: heading-1, text, table, figure, formula, header, footer>",
+          "content": "<the element's text content; empty for type=figure>",
+          "coord": [left, top, right, bottom],
+          "description": "<a one-or-two sentence description, only for type=figure, else empty>"
+        }
+      ]
+    }
+
+    coord is in pixel space of the supplied image, top-left origin. Return every element on the page, in reading order.
+
+    For type="table", content MUST be an HTML table whose rows are wrapped in a single <tbody>...</tbody> element, e.g. "<table><tbody><tr><td>...</td></tr></tbody></table>" — this exact shape (a <tbody> tag around the rows) is required so a table split across a page break can be merged with an adjacent page's table.
+
+    Respond with only the JSON object.
+  # A page-189-of-stmicro-financial-report.pdf spot check (rotated
+  # footnote text) showed the model confidently returning plausible but
+  # wrong text on a retry -- a quiet, fluent failure, unlike docling's
+  # visibly garbled one. A successful call is evidence of *some*
+  # structured answer, not a correct one, so elements from the fallback
+  # recognizer must not claim full confidence. Deliberately below
+  # recognition.confidence_threshold, so a fallback-recognized page still
+  # reads as "worth another look" rather than "resolved" if re-evaluated.
+  fallback_result_confidence: 0.6
+
+# Headless LibreOffice, DOCX/PPTX -> PDF normalization.
+office_convert:
+  timeout_seconds: 120
+
+# The Service's Postgres-backed page-job queue and Worker claim loop.
+queue:
+  page_job_lease_seconds: 300
+  page_job_max_attempts: 3
+  worker_poll_interval_seconds: 1.0
+  # See Settings.worker_page_concurrency's docstring (docolage_service/
+  # config.py) for why this is an operator-facing replica-count signal
+  # rather than in-process concurrency.
+  worker_page_concurrency: 1
+  job_stall_timeout_seconds: 900.0
+  job_stall_check_interval_polls: 10
+  # Higher priority is claimed first (db/queries.py). Sync jobs outrank
+  # async jobs so a large async document can never make a waiting Sync
+  # client queue behind it.
+  sync_priority: 10
+  async_priority: 0
+
+# POST /submit validation.
+submit:
+  max_upload_bytes: 104857600  # 100 MiB
+  # Measured: benchmark/measure_worker_defaults.py on 2026-08-17, CPU
+  # only. See docs/operations.md and benchmark/worker_defaults.json for
+  # the full methodology; re-run on the target GPU host before relying
+  # on this in production.
+  sync_gate_max_pages: 1
+
+# GET /jobs/{id}/stream (SSE), ADR-0008.
+sync_stream:
+  poll_interval_seconds: 0.4
+  # Measured alongside sync_gate_max_pages above; see the same benchmark
+  # methodology notes.
+  timeout_seconds: 60.0
+
+result:
+  retention_days: 7
+
+postgres:
+  pool_min_size: 1
+  pool_max_size: 10
+
+object_storage:
+  region: us-east-1
+  use_ssl: false

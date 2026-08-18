@@ -24,7 +24,7 @@ SOFFICE_AVAILABLE = shutil.which("soffice") is not None or shutil.which("libreof
 
 
 def _config(output_dir: Path) -> docolage.DocolageConfig:
-    return docolage.DocolageConfig(output_volume_path=str(output_dir))
+    return docolage.DocolageConfig(output_path=str(output_dir))
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +145,9 @@ def test_office_handler_delegates_to_pdf_parse_after_conversion(monkeypatch, tmp
     converted_path = tmp_output_volume / "converted.pdf"
     converted_path.write_bytes(b"%PDF-fake")
 
-    monkeypatch.setattr(office_format, "convert_to_pdf", lambda path, output_dir: converted_path)
+    monkeypatch.setattr(
+        office_format, "convert_to_pdf", lambda path, output_dir, timeout_seconds: converted_path
+    )
 
     received = {}
 
