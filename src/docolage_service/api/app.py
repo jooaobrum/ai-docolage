@@ -18,13 +18,20 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from docolage_service.api.rate_limit import limiter
 from docolage_service.api.routes import health, jobs, sync_stream
 from docolage_service.config import Settings, get_settings
 from docolage_service.db.migrator import run_migrations
 from docolage_service.db.pool import create_pool
+from docolage_service.logging_config import configure_logging
 from docolage_service.storage.object_store import ObjectStore, ObjectStoreSettings
+
+configure_logging("api")
 
 
 def _build_object_store(settings: Settings) -> ObjectStore:
@@ -61,9 +68,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await app.state.pg_pool.close()
 
     app = FastAPI(title="docolage service", lifespan=lifespan)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore[arg-type]
+
     app.include_router(health.router)
     app.include_router(jobs.router)
     app.include_router(sync_stream.router)
+
+    @app.get("/metrics")
+    async def metrics() -> Response:
+        return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
     return app
 
 

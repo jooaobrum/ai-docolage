@@ -2,7 +2,67 @@
 # different CMD per service (see docker-compose.yml) — both processes need
 # the same docolage + docolage_service install, so building it twice would
 # just double the build time for no benefit.
-FROM python:3.11-slim
+#
+# Multi-stage: the `builder` stage has build-essential and the pip wheel
+# cache; only the installed venv and the pre-fetched docling model weights
+# cross into `runtime`, so the shipped image carries neither the compiler
+# toolchain nor any pip/HF download cache.
+#
+# Offline-by-design: docling's models (layout, TableFormer, OCR) are NOT
+# part of the `docling` PyPI package — DocumentConverter fetches them from
+# Hugging Face Hub the first time it runs. On a firewalled/offline host
+# that first call would hang or fail. This image instead pre-downloads
+# them at *build* time (`docling-tools models download`, network-enabled)
+# into docling's default cache dir, and the runtime stage sets
+# HF_HUB_OFFLINE=1 so the running container never attempts an outbound
+# call to huggingface.co, even by accident.
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# libgl1/libglib2.0-0/libsm6/libxext6/libxrender1/libxcb1 are needed here
+# too, not just in `runtime`: `docling-tools models download rapidocr`
+# below imports rapidocr, which imports cv2 at import time (see
+# Dockerfile's runtime-stage comment for the full explanation) — so the
+# download step itself fails without these, independent of anything the
+# final image needs at request-serving time.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+COPY pyproject.toml CONTEXT.md ./
+COPY src ./src
+
+# CPU-only torch wheel index: docling depends on torch transitively, and
+# resolving it from plain PyPI can pull CUDA runtime shared libraries into
+# a CPU-only image for no benefit. This image never runs a GPU (that's
+# Dockerfile.worker-gpu's job), so pin the CPU wheel explicitly.
+RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/whl/cpu \
+    ".[service,openai]"
+
+# Only the models this recognizer's pipeline actually uses (see
+# recognizer_docling.py: DocumentConverter runs with default
+# PdfPipelineOptions, i.e. do_table_structure=True, do_ocr=True via the
+# default OCR engine (rapidocr), and do_picture_classification /
+# do_code_enrichment / do_formula_enrichment all default False) — so
+# picture_classifier, code_formula and easyocr are deliberately skipped
+# to keep this layer as small as possible. Downloads into docling's
+# default cache dir ($HOME/.cache/docling, i.e. /root/.cache/docling
+# here), matched exactly by the COPY in the runtime stage below.
+RUN docling-tools models download layout tableformer rapidocr
+
+# ---------------------------------------------------------------------
+
+FROM python:3.11-slim AS runtime
 
 WORKDIR /app
 
@@ -17,7 +77,6 @@ WORKDIR /app
 # cv2` fails with "libxcb.so.1: cannot open shared object file" without
 # them, even though nothing here does any actual GUI/X11 work.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -26,10 +85,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml CONTEXT.md ./
-COPY src ./src
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /root/.cache/docling /root/.cache/docling
+ENV PATH="/opt/venv/bin:$PATH"
 
-RUN pip install --no-cache-dir ".[service,openai]"
+# HF_HUB_OFFLINE: hard-blocks huggingface_hub from any network call at
+# runtime — the models are already baked into the image above, so this
+# container should never need (or be able) to reach huggingface.co, which
+# matters on firewalled/offline hosts where such a call would just hang.
+ENV HF_HUB_OFFLINE=1
+ENV HF_HUB_DISABLE_TELEMETRY=1
+
+# DOCLING_ARTIFACTS_PATH is load-bearing, not belt-and-suspenders: unlike
+# the layout/TableFormer models (resolved via huggingface_hub, which
+# HF_HUB_OFFLINE governs), RapidOCR's default "torch" engine resolves its
+# checkpoint path itself and, left unset, falls back to downloading from
+# modelscope.cn with a plain `requests.get` — a call HF_HUB_OFFLINE does
+# NOT block, and modelscope.cn's on a completely different host than the
+# layout/TableFormer models besides. Pointing this at the exact directory
+# `docling-tools models download` populated above (COPY'd in verbatim) is
+# what makes RapidOCR use the baked-in checkpoint instead of reaching out
+# — verified with `docker run --network none`.
+ENV DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models
 
 # Default command; overridden per-service in docker-compose.yml.
 CMD ["uvicorn", "docolage_service.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -103,6 +103,13 @@ async def count_pages_done(pool: asyncpg.Pool, job_id: str) -> int:
         )
 
 
+async def count_queued_page_jobs(pool: asyncpg.Pool) -> int:
+    """Page jobs waiting to be claimed -- sampled periodically for the
+    docolage_queue_depth metrics gauge."""
+    async with pool.acquire() as conn:
+        return await conn.fetchval("SELECT count(*) FROM page_jobs WHERE status = 'queued'")
+
+
 @dataclass
 class ClaimedPageJob:
     """One page_job claimed by a Worker, joined with the parent job's
@@ -388,6 +395,130 @@ async def fetch_page_outcomes_since(
     return [PageOutcome(page_number=r["page_number"], markdown=r["markdown"], error=r["error"]) for r in rows]
 
 
+async def cancel_job(pool: asyncpg.Pool, job_id: str) -> str | None:
+    """Cancel a job: mark it and any not-yet-claimed/claimed page_jobs
+    'cancelled'. A no-op (returns the unchanged status) if the job is
+    already in a terminal state — cancelling a finished job isn't an
+    error, just nothing to do. Returns None if the job doesn't exist.
+
+    A page_job already claimed by a Worker still gets flipped to
+    'cancelled' here, but the Worker processing it has no way to learn
+    that mid-flight; when it later calls `complete_page_job` or
+    `fail_page_job`, those act on the specific page_job_id regardless of
+    its current status, so the row's terminal state ends up whichever
+    wrote last. `_finalize_job_if_terminal`'s guard excludes 'cancelled'
+    from further overwrites, so the parent job's 'cancelled' status is
+    not clobbered even if such a page later reports success.
+    """
+    async with pool.acquire() as conn, conn.transaction():
+        row = await conn.fetchrow(
+            """
+            UPDATE jobs SET status = 'cancelled', updated_at = now()
+            WHERE id = $1::uuid AND status NOT IN ('completed', 'partial', 'failed', 'cancelled')
+            RETURNING status
+            """,
+            job_id,
+        )
+        if row is None:
+            existing = await conn.fetchrow("SELECT status FROM jobs WHERE id = $1::uuid", job_id)
+            return existing["status"] if existing is not None else None
+
+        await conn.execute(
+            """
+            UPDATE page_jobs SET status = 'cancelled', updated_at = now()
+            WHERE job_id = $1::uuid AND status IN ('queued', 'claimed')
+            """,
+            job_id,
+        )
+        return row["status"]
+
+
+async def retry_job(pool: asyncpg.Pool, job_id: str) -> str | None:
+    """Requeue a 'failed' or 'partial' job: reset its permanently-failed
+    page_jobs back to 'queued' with a fresh attempt budget, and flip the
+    job itself back to 'queued' so the existing claim query and
+    `mark_job_running_if_needed` pick it up exactly like a new submission.
+
+    Returns the job's new status ('queued'), or None if the job doesn't
+    exist, or the unchanged current status if it isn't in a retryable
+    state (caller turns that into a 409).
+    """
+    async with pool.acquire() as conn, conn.transaction():
+        job = await conn.fetchrow("SELECT status FROM jobs WHERE id = $1::uuid FOR UPDATE", job_id)
+        if job is None:
+            return None
+        if job["status"] not in ("failed", "partial"):
+            return job["status"]
+
+        await conn.execute(
+            """
+            UPDATE page_jobs
+            SET status = 'queued',
+                error_message = NULL,
+                claimed_at = NULL,
+                lease_expires_at = NULL,
+                attempt_count = 0,
+                updated_at = now()
+            WHERE job_id = $1::uuid AND status = 'failed'
+            """,
+            job_id,
+        )
+        row = await conn.fetchrow(
+            """
+            UPDATE jobs SET status = 'queued', error_summary = NULL, updated_at = now()
+            WHERE id = $1::uuid
+            RETURNING status
+            """,
+            job_id,
+        )
+        return row["status"]
+
+
+async def list_jobs(
+    pool: asyncpg.Pool,
+    *,
+    status: str | None = None,
+    stale_only: bool = False,
+    stale_after_seconds: float | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[JobRow]:
+    """List jobs, newest first, optionally filtered by status and/or
+    restricted to 'running' jobs that have made no progress for
+    `stale_after_seconds` (defaults to the same `job_stall_timeout_seconds`
+    `fail_stalled_jobs` uses) — a read-only view of the same staleness
+    check, for spotting stuck jobs without mutating them.
+    """
+    conditions: list[str] = []
+    params: list[object] = []
+
+    if status is not None:
+        params.append(status)
+        conditions.append(f"status = ${len(params)}")
+
+    if stale_only:
+        seconds = stale_after_seconds if stale_after_seconds is not None else _queue["job_stall_timeout_seconds"]
+        params.append(seconds)
+        conditions.append(f"status = 'running' AND updated_at < now() - make_interval(secs => ${len(params)})")
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    params.extend([limit, offset])
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            f"""
+            SELECT id, delivery_mode, priority, source_uri, original_filename,
+                   format, total_pages, status, error_summary, created_at, updated_at
+            FROM jobs
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT ${len(params) - 1} OFFSET ${len(params)}
+            """,
+            *params,
+        )
+    return [JobRow(**dict(row)) for row in rows]
+
+
 async def _finalize_job_if_terminal(conn: asyncpg.Connection, job_id: str) -> None:
     """If every page_job for job_id has reached a terminal state
     (succeeded, or permanently failed — never queued/claimed/running,
@@ -405,7 +536,7 @@ async def _finalize_job_if_terminal(conn: asyncpg.Connection, job_id: str) -> No
     await conn.execute(
         """
         UPDATE jobs SET status = $2, updated_at = now()
-        WHERE id = $1::uuid AND status NOT IN ('completed', 'partial', 'failed')
+        WHERE id = $1::uuid AND status NOT IN ('completed', 'partial', 'failed', 'cancelled')
         """,
         job_id,
         derived,

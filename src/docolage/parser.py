@@ -24,9 +24,9 @@ def _register_pdf_and_image_handlers() -> None:
     """Deferred import: pdf/image handlers depend on pypdfium2/Pillow,
     which markdown-only installs shouldn't be forced to exercise at
     import time."""
-    from docolage.formats import pdf as pdf_format
     from docolage.formats import image as image_format
     from docolage.formats import office as office_format
+    from docolage.formats import pdf as pdf_format
 
     _HANDLERS.setdefault(".pdf", pdf_format.parse)
     _HANDLERS.setdefault(".png", image_format.parse)

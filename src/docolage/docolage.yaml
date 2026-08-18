@@ -80,6 +80,14 @@ queue:
   worker_page_concurrency: 1
   job_stall_timeout_seconds: 900.0
   job_stall_check_interval_polls: 10
+  # Bounds a single page's rasterize+recognize+caption call (worker/main.py's
+  # `_process`). A page that exceeds this is treated as a normal failure and
+  # retried like any other (see fail_page_job) -- it does not interrupt the
+  # underlying thread (asyncio.wait_for cancels the await, not the OS
+  # thread), so it bounds queue-visible staleness, not the compute itself.
+  page_processing_timeout_seconds: 120.0
+  # Port the Worker's own GET /metrics (Prometheus) listens on.
+  worker_metrics_port: 9100
   # Higher priority is claimed first (db/queries.py). Sync jobs outrank
   # async jobs so a large async document can never make a waiting Sync
   # client queue behind it.
@@ -103,7 +111,7 @@ sync_stream:
   timeout_seconds: 60.0
 
 result:
-  retention_days: 7
+  retention_days: 365
 
 postgres:
   pool_min_size: 1

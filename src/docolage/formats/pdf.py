@@ -15,8 +15,8 @@ from pathlib import Path
 import pypdfium2 as pdfium
 
 from docolage import schema
-from docolage.config import DocolageConfig, default_recognizer
 from docolage.captioning import caption_figures
+from docolage.config import DocolageConfig, default_recognizer
 from docolage.crop import CROPPABLE_TYPES, crop_element
 from docolage.rasterize import rasterize_page
 from docolage.table_merge import merge_table_html

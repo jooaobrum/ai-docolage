@@ -147,7 +147,76 @@ HTTP API by design (no fault-injection endpoint) — this path is what
 already exercise against real Postgres via `pytest -m service`. Trust
 those over trying to reproduce a failure by hand.
 
-## 6. Tear down
+Once you *do* have a `failed`/`partial` job (real one, or from the tests
+above), `POST /jobs/{id}/retry` requeues its permanently-failed pages
+without re-uploading — see §6 below.
+
+## 6. Job management: cancel, retry, list
+
+```bash
+# List jobs, newest first
+curl -s "http://localhost:8000/jobs?limit=10" | python3 -m json.tool
+
+# Filter by status
+curl -s "http://localhost:8000/jobs?status=failed" | python3 -m json.tool
+
+# Surface stuck jobs: 'running' with no progress past the configured
+# job_stall_timeout_seconds (see docs/operations.md)
+curl -s "http://localhost:8000/jobs?stale=true" | python3 -m json.tool
+```
+
+Cancel a job (idempotent — cancelling twice, or a job that's already
+`completed`/`failed`, is a no-op, not an error):
+
+```bash
+curl -s -X POST "http://localhost:8000/jobs/$JOB_ID/cancel" | python3 -m json.tool
+curl -s "http://localhost:8000/jobs/$JOB_ID"   # status: cancelled
+```
+
+A page already claimed by a Worker when you cancel keeps running to
+completion (there's no way to interrupt an in-flight Worker) — only pages
+still `queued`/`claimed`-but-unstarted are stopped from being claimed
+again. The job's own status stays `cancelled` regardless.
+
+Retry a `failed`/`partial` job — this resets only its permanently-failed
+pages back to `queued` and requeues the job, no re-upload needed:
+
+```bash
+curl -s -X POST "http://localhost:8000/jobs/$JOB_ID/retry" | python3 -m json.tool
+```
+
+Expect a `409` if the job isn't currently `failed`/`partial` (e.g. still
+`queued`/`running`, or already `completed`) — the error message names the
+job's actual status.
+
+## 7. Metrics and rate limiting
+
+```bash
+# API metrics (jobs submitted/completed, etc.)
+curl -s http://localhost:8000/metrics | grep docolage_
+
+# Each Worker exposes its own metrics on :9100 (page latency, queue depth,
+# OpenAI-fallback count) -- with docker-compose's default single worker,
+# this maps straight to the host:
+curl -s http://localhost:9100/metrics | grep docolage_
+```
+
+Submit a job first if the counters read all-zero — `docolage_jobs_submitted_total`
+should increment immediately on submit, `docolage_page_jobs_total{result="succeeded"}`
+and `docolage_page_processing_seconds` once a page finishes.
+
+Rate limit (`POST /submit`, 10/minute per client IP):
+
+```bash
+for i in $(seq 1 15); do
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST http://localhost:8000/submit \
+    -F "file=@data/TSMCJ.PDF" -F "delivery=async"
+done
+```
+
+Expect the first ~10 to return `200`, the rest `429`.
+
+## 8. Tear down
 
 ```bash
 docker compose down -v   # -v also drops the postgres/minio volumes

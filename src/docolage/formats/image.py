@@ -6,8 +6,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from docolage import schema
-from docolage.config import DocolageConfig, default_recognizer
 from docolage.captioning import caption_figures
+from docolage.config import DocolageConfig, default_recognizer
 from docolage.crop import CROPPABLE_TYPES, crop_element
 
 _PAGE_ID = 1

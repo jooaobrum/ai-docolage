@@ -16,7 +16,7 @@ Figure captioning's degrade-to-nothing posture (ADR-0010).
 from __future__ import annotations
 
 import logging
-from typing import Optional
+from typing import Callable, Optional
 
 from docolage.ports import RecognitionResult, VLMRecognizer
 
@@ -40,10 +40,15 @@ class FallbackRecognizer:
         primary: VLMRecognizer,
         fallback: Optional[VLMRecognizer],
         confidence_threshold: float,
+        on_fallback: Optional[Callable[[], None]] = None,
     ) -> None:
         self._primary = primary
         self._fallback = fallback
         self._confidence_threshold = confidence_threshold
+        # Optional callback fired each time the fallback actually runs and
+        # succeeds -- lets a caller (e.g. the Worker) count escalations for
+        # a metric without this module depending on any metrics library.
+        self._on_fallback = on_fallback
 
     def recognize(self, image_path: str, page_id: int) -> RecognitionResult:
         result = self._primary.recognize(image_path, page_id)
@@ -55,7 +60,10 @@ class FallbackRecognizer:
             return result
 
         try:
-            return self._fallback.recognize(image_path, page_id)
+            fallback_result = self._fallback.recognize(image_path, page_id)
+            if self._on_fallback is not None:
+                self._on_fallback()
+            return fallback_result
         except Exception:
             logger.debug(
                 "Recognition fallback raised for image_path=%r page_id=%s; "

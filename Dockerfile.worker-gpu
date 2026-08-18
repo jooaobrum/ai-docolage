@@ -17,18 +17,25 @@
 # Using the NVIDIA Container Toolkit on the host is required to actually
 # expose a GPU to this image at `docker run`/`docker compose up` time; see
 # docs/operations.md.
-FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+#
+# Multi-stage, same reasoning as Dockerfile.service: build-essential and
+# the pip/HF download cache stay in `builder`; only the venv and the
+# pre-fetched docling model weights cross into `runtime`. See
+# Dockerfile.service's header for why the models are baked in at build
+# time (offline-by-design) rather than left to download on first use.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS builder
 
 WORKDIR /app
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_NO_CACHE_DIR=1
 
-# libgl1/libglib2.0-0/libsm6/libxext6/libxrender1/libxcb1: not for
-# anything we call directly — opencv-python (a transitive dependency of
-# docling via docling-ibm-models' TableFormer) dynamically links against
-# them at `import cv2` time, and neither python3.11-slim nor this CUDA
-# runtime base ships them (see Dockerfile.service for the same fix).
+# libgl1/libglib2.0-0/libsm6/libxext6/libxrender1/libxcb1 are needed here
+# too, not just in `runtime`: `docling-tools models download rapidocr`
+# below imports rapidocr, which imports cv2 at import time (see
+# Dockerfile.service's runtime-stage comment for the full explanation) —
+# so the download step itself fails without these, independent of
+# anything the final image needs at request-serving time.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3.11 \
@@ -44,6 +51,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
     && ln -sf /usr/bin/python3.11 /usr/bin/python
 
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
 COPY pyproject.toml CONTEXT.md ./
 COPY src ./src
 
@@ -56,6 +66,52 @@ COPY src ./src
 RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124
 
 RUN pip install --no-cache-dir ".[service,openai]"
+
+# Only the models this recognizer's pipeline actually uses — see the same
+# comment in Dockerfile.service. Downloads into docling's default cache
+# dir ($HOME/.cache/docling, i.e. /root/.cache/docling here), matched
+# exactly by the COPY in the runtime stage below.
+RUN docling-tools models download layout tableformer rapidocr
+
+# ---------------------------------------------------------------------
+
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04 AS runtime
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# libgl1/libglib2.0-0/libsm6/libxext6/libxrender1/libxcb1: not for
+# anything we call directly — opencv-python (a transitive dependency of
+# docling via docling-ibm-models' TableFormer) dynamically links against
+# them at `import cv2` time, and neither python3.11-slim nor this CUDA
+# runtime base ships them (see Dockerfile.service for the same fix).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python
+
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /root/.cache/docling /root/.cache/docling
+ENV PATH="/opt/venv/bin:$PATH"
+
+# See Dockerfile.service: models are baked in above, so this container
+# should never reach out to huggingface.co at runtime.
+ENV HF_HUB_OFFLINE=1
+ENV HF_HUB_DISABLE_TELEMETRY=1
+
+# Load-bearing, not belt-and-suspenders — see Dockerfile.service's comment
+# on this same var: RapidOCR's default engine ignores HF_HUB_OFFLINE and
+# needs this set explicitly to use the baked-in checkpoint instead of
+# reaching out to modelscope.cn.
+ENV DOCLING_ARTIFACTS_PATH=/root/.cache/docling/models
 
 # Only the worker needs this image; the api service keeps using the plain
 # CPU image (Dockerfile.service) since it never runs docling models.

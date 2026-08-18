@@ -9,6 +9,7 @@ Service).
 from docolage.config import DocolageConfig
 from docolage.parser import parse
 
+
 def __getattr__(name: str):
     if name in ("OpenAICaptioner", "build_openai_captioner", "resolve_openai_api_key"):
         from docolage import captioner_openai

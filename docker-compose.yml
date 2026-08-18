@@ -15,11 +15,15 @@ services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: docolage
-      POSTGRES_PASSWORD: docolage
-      POSTGRES_DB: docolage
+      POSTGRES_USER: ${POSTGRES_USER:-docolage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-docolage}
+      POSTGRES_DB: ${POSTGRES_DB:-docolage}
     ports:
-      - "5432:5432"
+      # Remapped host-side to 5433: a native Homebrew Postgres already
+      # owns 127.0.0.1:5432 on dev Macs, and its exact-address bind wins
+      # over Docker's wildcard bind on that port, silently routing
+      # localhost:5432 connections to the wrong (host) Postgres.
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -32,8 +36,8 @@ services:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
     environment:
-      MINIO_ROOT_USER: docolage
-      MINIO_ROOT_PASSWORD: docolage123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-docolage}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-docolage123}
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -53,11 +57,11 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DOCOLAGE_POSTGRES_DSN: postgresql://docolage:docolage@postgres:5432/docolage
+      DOCOLAGE_POSTGRES_DSN: postgresql://${POSTGRES_USER:-docolage}:${POSTGRES_PASSWORD:-docolage}@postgres:5432/${POSTGRES_DB:-docolage}
       DOCOLAGE_OBJECT_STORAGE_ENDPOINT_URL: http://minio:9000
       DOCOLAGE_OBJECT_STORAGE_BUCKET: docolage
-      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: docolage
-      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: docolage123
+      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-docolage}
+      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-docolage123}
       # Bind-mounted below so every tunable (models, thresholds, prompts,
       # timeouts, queue/sync knobs) can be edited without rebuilding the
       # image — see src/docolage/docolage.yaml, the one source of truth.
@@ -75,12 +79,14 @@ services:
       context: .
       dockerfile: Dockerfile.service
     command: ["python", "-m", "docolage_service.worker.main"]
+    ports:
+      - "9100:9100"
     environment:
-      DOCOLAGE_POSTGRES_DSN: postgresql://docolage:docolage@postgres:5432/docolage
+      DOCOLAGE_POSTGRES_DSN: postgresql://${POSTGRES_USER:-docolage}:${POSTGRES_PASSWORD:-docolage}@postgres:5432/${POSTGRES_DB:-docolage}
       DOCOLAGE_OBJECT_STORAGE_ENDPOINT_URL: http://minio:9000
       DOCOLAGE_OBJECT_STORAGE_BUCKET: docolage
-      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: docolage
-      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: docolage123
+      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: ${MINIO_ROOT_USER:-docolage}
+      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-docolage123}
       # Optional: figure captioning via the External OpenAI API (ADR-0010,
       # unconditional-when-configured). Unset -> figures get no
       # description, nothing fails. Set on the host shell before `docker

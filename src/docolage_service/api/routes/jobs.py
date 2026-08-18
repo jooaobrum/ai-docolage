@@ -10,18 +10,19 @@ This module does not build the sync stream (ticket #23) or the result
 endpoint (ticket #22) — only submit + status.
 """
 
-from __future__ import annotations
-
 import logging
 import uuid
+from datetime import datetime
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 from pydantic import BaseModel
 
+from docolage_service.api.rate_limit import limiter
 from docolage_service.db import queries
 from docolage_service.jobs import reassembly
+from docolage_service.metrics import JOBS_SUBMITTED_TOTAL
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,7 @@ def _convert_office_to_pdf_and_count_pages(raw_bytes: bytes, filename: str, time
         return _count_pdf_pages(converted_path.read_bytes(), filename)
 
 @router.post("/submit", response_model=SubmitResponse)
+@limiter.limit("10/minute")
 async def submit(
     request: Request,
     file: UploadFile = File(...),
@@ -158,6 +160,9 @@ async def submit(
         total_pages=total_pages,
     )
 
+    JOBS_SUBMITTED_TOTAL.labels(delivery=delivery).inc()
+    logger.info("submitted job_id=%s delivery=%s pages=%s", job_id, delivery, total_pages, extra={"job_id": job_id})
+
     return SubmitResponse(job_id=job_id, status="queued")
 
 async def _fetch_job_or_404(pool, job_id: str) -> queries.JobRow:
@@ -176,8 +181,11 @@ async def get_job_status(job_id: str, request: Request) -> JobStatusResponse:
     pool = request.app.state.pg_pool
 
     job = await _fetch_job_or_404(pool, job_id)
-    pages_done = await queries.count_pages_done(pool, job_id)
+    return await _job_status_response(pool, job_id, job)
 
+
+async def _job_status_response(pool, job_id: str, job: queries.JobRow) -> JobStatusResponse:
+    pages_done = await queries.count_pages_done(pool, job_id)
     return JobStatusResponse(
         job_id=str(job.id),
         status=job.status,
@@ -185,6 +193,109 @@ async def get_job_status(job_id: str, request: Request) -> JobStatusResponse:
         pages_total=job.total_pages,
         delivery=job.delivery_mode,
         error=job.error_summary,
+    )
+
+
+# Every status a job can be in — the CHECK constraint's source of truth on
+# the Python side, used to validate ?status= on GET /jobs (spec: reject
+# unknown values with an actionable 400, matching the `delivery` validation
+# in submit above).
+_JOB_STATUSES = {"queued", "running", "completed", "partial", "failed", "cancelled"}
+
+# Jobs a client can meaningfully ask to retry: derive_job_status only
+# reaches 'failed' or 'partial' once at least one page has permanently
+# failed (docolage_service/jobs/status.py) — retrying anything else (still
+# in-flight, or fully completed) is a client error, not a queue operation.
+_RETRYABLE_STATUSES = {"failed", "partial"}
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=JobStatusResponse)
+async def cancel_job(job_id: str, request: Request) -> JobStatusResponse:
+    pool = request.app.state.pg_pool
+
+    await _fetch_job_or_404(pool, job_id)
+    await queries.cancel_job(pool, job_id)
+
+    job = await _fetch_job_or_404(pool, job_id)
+    return await _job_status_response(pool, job_id, job)
+
+
+@router.post("/jobs/{job_id}/retry", response_model=JobStatusResponse)
+async def retry_job(job_id: str, request: Request) -> JobStatusResponse:
+    pool = request.app.state.pg_pool
+
+    job = await _fetch_job_or_404(pool, job_id)
+    if job.status not in _RETRYABLE_STATUSES:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Job {job_id!r} has status {job.status!r}; only jobs with status "
+                f"{sorted(_RETRYABLE_STATUSES)} can be retried."
+            ),
+        )
+
+    await queries.retry_job(pool, job_id)
+
+    job = await _fetch_job_or_404(pool, job_id)
+    return await _job_status_response(pool, job_id, job)
+
+
+class JobSummary(BaseModel):
+    job_id: str
+    status: str
+    delivery: str
+    total_pages: int
+    created_at: datetime
+    updated_at: datetime
+    error: str | None = None
+
+
+class JobListResponse(BaseModel):
+    jobs: list[JobSummary]
+    limit: int
+    offset: int
+
+
+@router.get("/jobs", response_model=JobListResponse)
+async def list_jobs(
+    request: Request,
+    status: str | None = Query(None, description="Filter by job status"),
+    stale: bool = Query(False, description="Only 'running' jobs with no progress for stale_after_seconds"),
+    stale_after_seconds: int | None = Query(None, description="Overrides the configured stall timeout"),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+) -> JobListResponse:
+    if status is not None and status not in _JOB_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"status must be one of {sorted(_JOB_STATUSES)}, got {status!r}.",
+        )
+
+    pool = request.app.state.pg_pool
+    rows = await queries.list_jobs(
+        pool,
+        status=status,
+        stale_only=stale,
+        stale_after_seconds=stale_after_seconds,
+        limit=limit,
+        offset=offset,
+    )
+
+    return JobListResponse(
+        jobs=[
+            JobSummary(
+                job_id=str(row.id),
+                status=row.status,
+                delivery=row.delivery_mode,
+                total_pages=row.total_pages,
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+                error=row.error_summary,
+            )
+            for row in rows
+        ],
+        limit=limit,
+        offset=offset,
     )
 
 

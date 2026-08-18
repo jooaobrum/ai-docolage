@@ -29,21 +29,28 @@ from pathlib import Path
 
 import asyncpg
 
-from docolage.config import default_recognizer
+from docolage import schema
 from docolage.captioner_openai import build_openai_captioner
 from docolage.captioning import caption_figures
+from docolage.config import default_recognizer
 from docolage.crop import CROPPABLE_TYPES, crop_element
 from docolage.rasterize import rasterize_page
 from docolage.recognizer_fallback import FallbackRecognizer
 from docolage.recognizer_openai import build_openai_recognizer
-from docolage import schema
 from docolage.settings_loader import section
 from docolage_service.config import get_settings
 from docolage_service.db import queries
 from docolage_service.db.pool import create_pool
+from docolage_service.logging_config import configure_logging
+from docolage_service.metrics import (
+    OPENAI_FALLBACK_TOTAL,
+    PAGE_JOBS_TOTAL,
+    PAGE_PROCESSING_SECONDS,
+    QUEUE_DEPTH,
+)
 from docolage_service.storage.object_store import ObjectStore, ObjectStoreSettings
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+configure_logging("worker")
 logger = logging.getLogger("docolage_service.worker")
 
 
@@ -98,6 +105,7 @@ async def claim_and_process_one(
     dpi: int = section("recognition")["dpi"],
     figure_captioner=None,
     max_attempts: int = section("queue")["page_job_max_attempts"],
+    page_processing_timeout_seconds: float = section("queue")["page_processing_timeout_seconds"],
 ) -> bool:
     """Claim one page_job and process it end to end. Returns True if a
     page_job was claimed (regardless of success/failure), False if there
@@ -119,6 +127,7 @@ async def claim_and_process_one(
         claimed.job_id,
         claimed.page_number,
         claimed.attempt_count,
+        extra={"job_id": str(claimed.job_id), "page_job_id": str(claimed.id)},
     )
     await queries.mark_job_running_if_needed(pool, claimed.job_id)
 
@@ -169,8 +178,17 @@ async def claim_and_process_one(
             elements = caption_figures(elements, figure_captioner)
             return result.markdown, elements
 
-        markdown, elements = await asyncio.to_thread(_process)
+        try:
+            with PAGE_PROCESSING_SECONDS.time():
+                markdown, elements = await asyncio.wait_for(
+                    asyncio.to_thread(_process), timeout=page_processing_timeout_seconds
+                )
+        except asyncio.TimeoutError as exc:
+            raise TimeoutError(
+                f"page timed out after {page_processing_timeout_seconds}s"
+            ) from exc
 
+        PAGE_JOBS_TOTAL.labels(result="succeeded").inc()
         await queries.complete_page_job(
             pool,
             page_job_id=claimed.id,
@@ -179,14 +197,22 @@ async def claim_and_process_one(
             markdown=markdown,
             elements=json.dumps(elements),
         )
-        logger.info("succeeded page_job id=%s job_id=%s page_number=%s", claimed.id, claimed.job_id, claimed.page_number)
+        logger.info(
+            "succeeded page_job id=%s job_id=%s page_number=%s",
+            claimed.id,
+            claimed.job_id,
+            claimed.page_number,
+            extra={"job_id": str(claimed.job_id), "page_job_id": str(claimed.id)},
+        )
     except Exception as exc:  # noqa: BLE001 - a failed page must not crash the worker
+        PAGE_JOBS_TOTAL.labels(result="failed").inc()
         logger.exception(
             "failed page_job id=%s job_id=%s page_number=%s: %s",
             claimed.id,
             claimed.job_id,
             claimed.page_number,
             exc,
+            extra={"job_id": str(claimed.job_id), "page_job_id": str(claimed.id)},
         )
         await queries.fail_page_job(
             pool,
@@ -202,6 +228,11 @@ async def claim_and_process_one(
 async def run() -> None:
     settings = get_settings()
     stop_event = asyncio.Event()
+
+    from prometheus_client import start_http_server
+
+    start_http_server(settings.worker_metrics_port)
+    logger.info("worker metrics exposed on :%s/metrics", settings.worker_metrics_port)
 
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):
@@ -259,6 +290,7 @@ async def run() -> None:
         default_recognizer(),
         openai_recognizer,
         confidence_threshold=settings.recognition_confidence_threshold,
+        on_fallback=OPENAI_FALLBACK_TOTAL.inc,
     )
 
     # Unconditional captioning, per ADR-0010: caption every figure when a
@@ -317,8 +349,10 @@ async def run() -> None:
                     dpi=settings.page_dpi,
                     max_attempts=settings.page_job_max_attempts,
                     figure_captioner=figure_captioner,
+                    page_processing_timeout_seconds=settings.page_processing_timeout_seconds,
                 )
                 if not claimed_something:
+                    QUEUE_DEPTH.set(await queries.count_queued_page_jobs(pool))
                     idle_polls_since_stall_check += 1
                     if idle_polls_since_stall_check >= settings.job_stall_check_interval_polls:
                         idle_polls_since_stall_check = 0

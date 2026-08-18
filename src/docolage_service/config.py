@@ -139,6 +139,19 @@ class Settings(BaseSettings):
     job_stall_timeout_seconds: float = _queue["job_stall_timeout_seconds"]
     job_stall_check_interval_polls: int = _queue["job_stall_check_interval_polls"]
 
+    # Bounds a single page's rasterize+recognize+caption call (see
+    # worker/main.py's `_process`). A hung docling/OpenAI call on one page
+    # must not block the worker forever; see docolage.yaml's comment on
+    # this key for the cancellation caveat (the OS thread keeps running
+    # until it finishes naturally -- this bounds queue-visible staleness,
+    # not the compute itself).
+    page_processing_timeout_seconds: float = _queue["page_processing_timeout_seconds"]
+
+    # Port the Worker exposes its own GET /metrics on (prometheus_client's
+    # start_http_server) -- a separate port from the API's since the
+    # Worker is not an HTTP service otherwise.
+    worker_metrics_port: int = _queue["worker_metrics_port"]
+
     # --- Submit limits ----------------------------------------------------
     # sync_gate_max_pages was measured: benchmark/measure_worker_defaults.py
     # on 2026-08-17, CPU only (no GPU available in the measuring

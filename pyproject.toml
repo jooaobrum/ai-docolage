@@ -21,6 +21,14 @@ dependencies = [
     # deps and no hand-provisioned weights directory — so it belongs in the
     # Core's base install rather than an optional extra.
     "docling>=2.0.0",
+    # RapidOCR (docling's default OCR engine) auto-selects onnxruntime's
+    # optimized CPU kernels when this is importable, falling back to a
+    # much slower generic-torch execution path otherwise. Both the .onnx
+    # and .pth checkpoints are already baked into the image by
+    # `docling-tools models download rapidocr` (Dockerfile.service), so
+    # this adds no new model-download step and no new runtime network
+    # call -- just picks the faster of two already-local engines.
+    "onnxruntime>=1.17.0",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +36,8 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
     "mypy>=1.10.0",
+    "types-PyYAML",
+    "ruff>=0.6.0",
     "reportlab>=4.0.0",
     "python-docx>=1.0.0",
     "python-pptx>=0.6.23",
@@ -52,6 +62,9 @@ service = [
     "boto3>=1.34.0",
     "pydantic-settings>=2.2.0",
     "python-multipart>=0.0.9",
+    "python-json-logger>=2.0.0",
+    "prometheus-client>=0.20.0",
+    "slowapi>=0.1.9",
 ]
 
 [project.scripts]
@@ -74,3 +87,15 @@ markers = [
     "service: Service tests needing real Postgres/MinIO, excluded from the default run",
     "docling: real-docling-model smoke tests excluded from the default run",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+check_untyped_defs = true
+exclude = ["tests/", "benchmark/"]
