@@ -1,6 +1,7 @@
 # ai-docolage
 
-![ai-docolage logo](docs/imgs/logo.png)
+<img src="docs/imgs/logo.png" alt="ai-docolage logo" width="200">
+
 
 A self-hosted document intelligence pipeline that turns documents (PDF,
 PNG, Markdown, DOCX, PPTX) into structured layout, text, tables and
