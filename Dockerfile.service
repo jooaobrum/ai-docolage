@@ -1,0 +1,35 @@
+# Shared image for the `api` and `worker` compose services. One image,
+# different CMD per service (see docker-compose.yml) — both processes need
+# the same docolage + docolage_service install, so building it twice would
+# just double the build time for no benefit.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# libmagic/poppler etc. are Core-side concerns for later tickets; kept out
+# of this ticket's image on purpose to keep the base image small.
+#
+# The runtime libs below (libgl1, libglib2.0-0, libsm6, libxext6,
+# libxrender1, libxcb1) are not for anything we call directly — they're
+# what opencv-python (a transitive dependency of docling, via
+# docling-ibm-models' TableFormer) dynamically links against at import
+# time. python-slim has none of libX11's runtime by default, so `import
+# cv2` fails with "libxcb.so.1: cannot open shared object file" without
+# them, even though nothing here does any actual GUI/X11 work.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY pyproject.toml CONTEXT.md ./
+COPY src ./src
+
+RUN pip install --no-cache-dir ".[service,openai]"
+
+# Default command; overridden per-service in docker-compose.yml.
+CMD ["uvicorn", "docolage_service.api.app:app", "--host", "0.0.0.0", "--port", "8000"]

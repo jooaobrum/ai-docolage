@@ -1,0 +1,32 @@
+# Optional GPU override for the `worker` service (ticket #25). Not used by
+# a plain `docker compose up` — the default stack (docker-compose.yml
+# alone) stays CPU-only and requires no GPU, no NVIDIA Container Toolkit,
+# matching spec's "no cloud account, no cluster" MVP story.
+#
+# To run workers on GPU, layer this file on top of the base compose file:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --scale worker=2
+#
+# Requirements on the host:
+#   - an NVIDIA GPU and driver
+#   - the NVIDIA Container Toolkit installed and configured for Docker
+#     (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+#     so the Docker daemon can see `nvidia` as a device driver.
+#
+# Worker replica count is still the scaling knob (spec, "Deployment": also
+# the GPU count, since models are in-process) — each replica should be
+# scheduled onto a GPU with enough free VRAM for one docling model set,
+# per ADR-0010 and DOCOLAGE_WORKER_PAGE_CONCURRENCY's docstring in
+# src/docolage_service/config.py.
+services:
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker-gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

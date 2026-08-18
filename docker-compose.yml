@@ -1,0 +1,103 @@
+# Per spec: "A user brings up four containers with `docker compose up` —
+# api, worker (scaled to N), postgres, minio — and has a working document
+# parser with no cloud account, no cluster, and no vendor."
+#
+# Scale workers with: docker compose up --scale worker=3
+#
+# This default stack is CPU-only and requires no GPU or NVIDIA Container
+# Toolkit. To run workers on a real GPU instead, layer the optional
+# docker-compose.gpu.yml override on top (ticket #25; see that file and
+# docs/operations.md):
+#
+#     docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --scale worker=2
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: docolage
+      POSTGRES_PASSWORD: docolage
+      POSTGRES_DB: docolage
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docolage -d docolage"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: docolage
+      MINIO_ROOT_PASSWORD: docolage123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    command: ["uvicorn", "docolage_service.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "8000:8000"
+    environment:
+      DOCOLAGE_POSTGRES_DSN: postgresql://docolage:docolage@postgres:5432/docolage
+      DOCOLAGE_OBJECT_STORAGE_ENDPOINT_URL: http://minio:9000
+      DOCOLAGE_OBJECT_STORAGE_BUCKET: docolage
+      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: docolage
+      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: docolage123
+      # Bind-mounted below so every tunable (models, thresholds, prompts,
+      # timeouts, queue/sync knobs) can be edited without rebuilding the
+      # image — see src/docolage/docolage.yaml, the one source of truth.
+      DOCOLAGE_CONFIG_PATH: /app/config/docolage.yaml
+    volumes:
+      - ./src/docolage/docolage.yaml:/app/config/docolage.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.service
+    command: ["python", "-m", "docolage_service.worker.main"]
+    environment:
+      DOCOLAGE_POSTGRES_DSN: postgresql://docolage:docolage@postgres:5432/docolage
+      DOCOLAGE_OBJECT_STORAGE_ENDPOINT_URL: http://minio:9000
+      DOCOLAGE_OBJECT_STORAGE_BUCKET: docolage
+      DOCOLAGE_OBJECT_STORAGE_ACCESS_KEY: docolage
+      DOCOLAGE_OBJECT_STORAGE_SECRET_KEY: docolage123
+      # Optional: figure captioning via the External OpenAI API (ADR-0010,
+      # unconditional-when-configured). Unset -> figures get no
+      # description, nothing fails. Set on the host shell before `docker
+      # compose up` (never hardcode a real key in this file).
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # See the api service's comment above — same mount, same file.
+      DOCOLAGE_CONFIG_PATH: /app/config/docolage.yaml
+    volumes:
+      - ./src/docolage/docolage.yaml:/app/config/docolage.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,62 @@
+# GPU-capable variant of the worker image (ticket #25). The default
+# Dockerfile.service image is CPU-oriented (plain `python:3.11-slim`, and
+# `pip install ".[service]"` resolves torch's CPU-only wheel from PyPI,
+# since docling depends on torch transitively). This image instead:
+#   - starts from an NVIDIA CUDA runtime base so the container has the CUDA
+#     libraries torch's GPU wheels link against, and
+#   - installs torch from PyTorch's CUDA wheel index *before* installing
+#     this package, so docling's transitive `torch` requirement is already
+#     satisfied by the GPU build and pip does not fall back to a CPU wheel.
+#
+# This image is only used by the `worker` service, and only when opted in
+# via docker-compose.gpu.yml (see that file and docker-compose.yml's
+# comment header) — `docker compose up` alone still builds the CPU image
+# from Dockerfile.service and works with no GPU and no NVIDIA Container
+# Toolkit, per spec's "no cloud account, no cluster" MVP story.
+#
+# Using the NVIDIA Container Toolkit on the host is required to actually
+# expose a GPU to this image at `docker run`/`docker compose up` time; see
+# docs/operations.md.
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PIP_NO_CACHE_DIR=1
+
+# libgl1/libglib2.0-0/libsm6/libxext6/libxrender1/libxcb1: not for
+# anything we call directly — opencv-python (a transitive dependency of
+# docling via docling-ibm-models' TableFormer) dynamically links against
+# them at `import cv2` time, and neither python3.11-slim nor this CUDA
+# runtime base ships them (see Dockerfile.service for the same fix).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3.11 \
+    python3.11-venv \
+    python3-pip \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    libxcb1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3 \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python
+
+COPY pyproject.toml CONTEXT.md ./
+COPY src ./src
+
+# Install the CUDA-enabled torch wheel first (cu124 index matches the
+# CUDA 12.4 runtime base above) so docling's `torch` dependency resolves
+# to this GPU build instead of falling back to PyPI's CPU-only wheel.
+# Bump the index URL's cuXXX suffix if you change the base image's CUDA
+# version; see https://pytorch.org/get-started/locally/ for the current
+# mapping of CUDA version -> wheel index.
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cu124
+
+RUN pip install --no-cache-dir ".[service,openai]"
+
+# Only the worker needs this image; the api service keeps using the plain
+# CPU image (Dockerfile.service) since it never runs docling models.
+CMD ["python", "-m", "docolage_service.worker.main"]
