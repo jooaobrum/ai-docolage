@@ -69,6 +69,8 @@ Optional extras, installed the same way (stack them as needed, e.g.
   External OpenAI API
 - `service` — FastAPI, asyncpg, boto3 and everything `docolage_service`
   needs to run the HTTP API and Workers outside Docker
+- `client` — `httpx`, needed to call the Service's job API from Python
+  via `docolage_service.client.DocolageClient` (see below)
 
 ### Environment variables
 
@@ -139,3 +141,27 @@ result = docolage.parse("path/to/document.pdf")
 No queue, no HTTP, no Postgres required — just the Python package and,
 optionally, `OPENAI_API_KEY` in the environment for Figure captions and
 recognition fallback.
+
+## Calling the Service from Python
+
+`docolage_service.client.DocolageClient` wraps the job API (`pip install
+-e ".[client]"`) so callers don't have to hand-roll HTTP requests against
+a running Service instance:
+
+```python
+from docolage_service.client import DocolageClient
+
+client = DocolageClient("http://localhost:8000")
+
+job = client.execute_job("report.pdf", delivery="async")
+client.get_job(job["job_id"])
+client.list_jobs(status="running")
+client.cancel_job(job["job_id"])
+client.retry_job(job["job_id"])
+client.get_job_result(job["job_id"], format="markdown")
+```
+
+Every method mirrors one endpoint in `src/docolage_service/api/routes/jobs.py`
+and returns the parsed JSON body as a `dict`; non-2xx responses raise
+`docolage_service.client.DocolageAPIError`. There's no `delete_job` — the
+API has no delete endpoint, only `cancel_job`/`retry_job`.
